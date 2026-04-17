@@ -189,22 +189,20 @@ function setGenre(val) {
 function populateGenres() {
   const select = document.getElementById('genre-select');
   if (!select) return;
-  const ids = new Set();
+  const genres = new Set();
   movies.forEach(m => {
-    if (m.genre_ids) m.genre_ids.split('|').forEach(id => {
-      if (id && TMDB_GENRES[id]) ids.add(id);
+    if (m.genre_ids) m.genre_ids.split('|').forEach(g => {
+      if (g.trim()) genres.add(g.trim());
     });
   });
-  if (ids.size === 0) return;
+  if (genres.size === 0) return;
   while (select.options.length > 1) select.remove(1);
-  [...ids]
-    .sort((a,b) => TMDB_GENRES[a].localeCompare(TMDB_GENRES[b]))
-    .forEach(id => {
-      const opt = document.createElement('option');
-      opt.value = id;
-      opt.textContent = TMDB_GENRES[id];
-      select.appendChild(opt);
-    });
+  [...genres].sort().forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = g;
+    opt.textContent = g;
+    select.appendChild(opt);
+  });
 }
  
 function renderGrid() {
