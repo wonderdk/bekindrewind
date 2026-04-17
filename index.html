@@ -84,6 +84,55 @@
   .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}
   .unwatched-label{font-size:11px;}
 }
+/* ── Detail view ── */
+.detail-view{min-height:100vh}
+.detail-backdrop-wrap{position:relative;height:320px;overflow:hidden;background:#111827;flex-shrink:0}
+.detail-backdrop{width:100%;height:100%;background-size:cover;background-position:center 20%;background-color:#111827}
+.detail-backdrop::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,rgba(15,22,40,.2) 0%,rgba(15,22,40,1) 100%)}
+.back-btn{position:absolute;top:16px;left:24px;z-index:10;background:#FFD600;color:#003087;border:none;font-size:12px;font-weight:700;padding:7px 14px;border-radius:3px;cursor:pointer;letter-spacing:.04em}
+.back-btn:hover{background:#ffe033}
+.detail-content{padding:0 24px 48px;max-width:960px;margin:-80px auto 0;position:relative;z-index:1}
+.detail-hero{display:flex;gap:24px;align-items:flex-start;margin-bottom:28px}
+.detail-poster{width:130px;flex-shrink:0;border-radius:4px;overflow:hidden;border:2px solid #2a3460;background:#232847;aspect-ratio:2/3;display:flex;align-items:center;justify-content:center}
+.detail-poster img{width:100%;height:100%;object-fit:cover;display:block}
+.detail-info{flex:1;min-width:0;padding-top:8px}
+.detail-title{font-size:22px;font-weight:700;color:#fff;margin-bottom:8px;line-height:1.25}
+.detail-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;color:#9BA3C4;font-size:12px;margin-bottom:12px}
+.detail-meta .fmt-badge{position:static;font-size:9px}
+.detail-cert{border:1px solid #556080;border-radius:2px;padding:1px 5px;font-size:11px;color:#9BA3C4}
+.detail-boxset-label{background:rgba(0,0,0,.5);border:1px solid #FFD600;color:#FFD600;font-size:10px;font-weight:700;padding:1px 6px;border-radius:2px;letter-spacing:.04em}
+.detail-score{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.detail-score-pct{font-size:26px;font-weight:700;color:#FFD600;line-height:1}
+.detail-score-lbl{font-size:10px;color:#9BA3C4;line-height:1.4;letter-spacing:.04em;text-transform:uppercase}
+.detail-tagline{font-style:italic;color:#9BA3C4;font-size:13px;margin-bottom:14px;line-height:1.5}
+.detail-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.detail-watched-btn{background:#1a2240;border:1px solid #2a3460;color:#9BA3C4;font-size:12px;font-weight:500;padding:7px 14px;border-radius:3px;cursor:pointer}
+.detail-watched-btn:hover{border-color:#556080;color:#e8ecf8}
+.detail-watched-btn.is-watched{background:#0d2010;border-color:#4CAF50;color:#4CAF50}
+.trailer-btn{display:inline-flex;align-items:center;gap:6px;background:#FFD600;color:#003087;border:none;font-size:12px;font-weight:700;padding:7px 14px;border-radius:3px;cursor:pointer;text-decoration:none;letter-spacing:.04em}
+.trailer-btn:hover{background:#ffe033}
+.detail-section{margin-bottom:24px}
+.detail-section-title{color:#FFD600;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #2a3460}
+.detail-overview{color:#c4cadf;font-size:14px;line-height:1.75}
+.detail-director-name{color:#e8ecf8;font-size:14px}
+.cast-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px}
+.cast-card{text-align:center}
+.cast-photo{width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:3px;border:1px solid #2a3460;display:block}
+.cast-no-photo{width:100%;aspect-ratio:2/3;background:#1a2240;border-radius:3px;border:1px solid #2a3460}
+.cast-name{color:#e8ecf8;font-size:10px;font-weight:500;margin-top:5px;line-height:1.3}
+.cast-char{color:#556080;font-size:9px;margin-top:2px;line-height:1.3}
+.genre-tags{display:flex;flex-wrap:wrap;gap:6px}
+.genre-tag{background:#1a2240;border:1px solid #2a3460;color:#9BA3C4;font-size:11px;padding:4px 12px;border-radius:12px}
+.detail-error{color:#556080;padding:60px 0;text-align:center;font-size:14px}
+@media(max-width:600px){
+  .detail-backdrop-wrap{height:210px}
+  .detail-content{margin-top:-50px;padding:0 16px 40px}
+  .detail-hero{gap:14px}
+  .detail-poster{width:90px}
+  .detail-title{font-size:17px}
+  .cast-grid{grid-template-columns:repeat(auto-fill,minmax(70px,1fr))}
+  .back-btn{left:16px;top:12px}
+}
 </style>
 </head>
 <body>
@@ -143,6 +192,8 @@
     <div id="tonight-content"></div>
   </div>
 </div>
+
+<div id="view-detail" class="hidden"></div>
 
 <script>
 const CSV_URL = 'https://raw.githubusercontent.com/wonderdk/bekindrewind/main/movies.csv';
@@ -299,11 +350,11 @@ function renderGrid() {
   const visible = getFiltered();
   document.getElementById('shelf-count').textContent = visible.length + ' titles';
   document.getElementById('grid').innerHTML = visible.map((m,i) => `
-    <div class="card ${tonight.has(m.imdb_id)?'queued':''}" id="c-${m.imdb_id}">
+    <div class="card ${tonight.has(m.imdb_id)?'queued':''}" id="c-${m.imdb_id}" onclick="openDetail('${m.imdb_id}')">
       <div class="poster" style="background:#${['1a0a0a','0a1a0a','0a0a1a','1a1a0a','1a0a1a','0a1a1a'][i%6]}">
         <div class="scanlines"></div>
         ${m.poster_url ? `<img src="${m.poster_url}" alt="${m.title}" onerror="this.style.display='none'">` : ''}
-        <div class="watched-dot ${m.watched==='true'?'w-yes':'w-no'}" onclick="toggleWatched('${m.uid}')" title="${m.watched==='true'?'Mark unwatched':'Mark watched'}" style="cursor:pointer;"></div>
+        <div class="watched-dot ${m.watched==='true'?'w-yes':'w-no'}" onclick="event.stopPropagation();toggleWatched('${m.uid}')" title="${m.watched==='true'?'Mark unwatched':'Mark watched'}" style="cursor:pointer;"></div>
         <div class="fmt-badge ${fmtClass(m.format)}">${fmtLabel(m.format)}</div>
         <div class="pip"></div>
         ${m.box_set ? `<div class="boxset-icon" title="${m.box_set}">BOX</div>` : ''}
@@ -313,7 +364,7 @@ function renderGrid() {
           <div class="card-title">${m.title}</div>
           <div class="card-year">${m.year}</div>
         </div>
-        <button class="star-btn" onclick="toggleTonight('${m.imdb_id}')" title="Add to tonight">
+        <button class="star-btn" onclick="event.stopPropagation();toggleTonight('${m.imdb_id}')" title="Add to tonight">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="${tonight.has(m.imdb_id)?'#FFD600':'none'}" stroke="#FFD600" stroke-width="1.2">
             <polygon points="6,1 7.5,4.5 11.5,4.8 8.7,7.3 9.6,11.2 6,9.1 2.4,11.2 3.3,7.3 0.5,4.8 4.5,4.5"/>
           </svg>
@@ -381,11 +432,105 @@ function setUnwatched(checked) {
 
 function switchView(v) {
   currentView = v;
+  document.getElementById('view-detail').classList.add('hidden');
   document.getElementById('view-collection').classList.toggle('hidden', v !== 'collection');
   document.getElementById('view-tonight').classList.toggle('hidden', v !== 'tonight');
   document.getElementById('nav-collection').className = 'nav-item' + (v==='collection'?' active':'');
   document.getElementById('nav-tonight').className = 'nav-item tonight' + (v==='tonight'?' active':'');
   renderTonight();
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function openDetail(imdbId) {
+  const m = movies.find(m => m.imdb_id === imdbId);
+  if (!m) return;
+  document.getElementById('view-collection').classList.add('hidden');
+  document.getElementById('view-tonight').classList.add('hidden');
+  const el = document.getElementById('view-detail');
+  el.classList.remove('hidden');
+  el.innerHTML = '<div class="detail-view"><div class="detail-backdrop-wrap"><div class="detail-backdrop"></div><button class="back-btn" onclick="closeDetail()">← Back</button></div><div class="detail-content" style="color:#9BA3C4;padding-top:40px;text-align:center">Loading...</div></div>';
+  window.scrollTo(0, 0);
+  try {
+    const hdrs = { Authorization: `Bearer ${TMDB_TOKEN}` };
+    const findData = await fetch(`https://api.themoviedb.org/3/find/${imdbId}?external_source=imdb_id`, { headers: hdrs }).then(r => r.json());
+    const tmdbId = findData.movie_results?.[0]?.id;
+    if (!tmdbId) throw new Error('Not found');
+    const d = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}?append_to_response=credits,videos,release_dates`, { headers: hdrs }).then(r => r.json());
+
+    const backdropUrl = d.backdrop_path ? `https://image.tmdb.org/t/p/w1280${d.backdrop_path}` : '';
+    const posterUrl = d.poster_path ? `https://image.tmdb.org/t/p/w342${d.poster_path}` : (m.poster_url || '');
+    const score = d.vote_average ? Math.round(d.vote_average * 10) : null;
+    const director = d.credits?.crew?.find(c => c.job === 'Director')?.name || m.director || '';
+    const cast = (d.credits?.cast || []).slice(0, 8);
+    const genres = (d.genres || []).map(g => g.name);
+    const trailer = d.videos?.results?.find(v => v.type === 'Trailer' && v.site === 'YouTube');
+    const cert = d.release_dates?.results?.find(r => r.iso_3166_1 === 'US')
+      ?.release_dates?.find(r => r.certification)?.certification || '';
+    const isWatched = m.watched === 'true';
+
+    el.innerHTML = `
+      <div class="detail-view">
+        <div class="detail-backdrop-wrap">
+          <div class="detail-backdrop"${backdropUrl ? ` style="background-image:url('${backdropUrl}')"` : ''}></div>
+          <button class="back-btn" onclick="closeDetail()">← Back</button>
+        </div>
+        <div class="detail-content">
+          <div class="detail-hero">
+            <div class="detail-poster">
+              ${posterUrl ? `<img src="${posterUrl}" alt="${escHtml(m.title)}">` : '<div class="poster-placeholder"><div class="poster-placeholder-inner"></div></div>'}
+            </div>
+            <div class="detail-info">
+              <div class="detail-title">${escHtml(d.title || m.title)}</div>
+              <div class="detail-meta">
+                <span>${escHtml(m.year)}</span>
+                ${m.runtime ? `<span>${escHtml(m.runtime)} min</span>` : ''}
+                ${cert ? `<span class="detail-cert">${escHtml(cert)}</span>` : ''}
+                <span class="fmt-badge ${fmtClass(m.format)}">${fmtLabel(m.format)}</span>
+                ${m.box_set ? `<span class="detail-boxset-label">${escHtml(m.box_set)}</span>` : ''}
+              </div>
+              ${score !== null ? `<div class="detail-score"><span class="detail-score-pct">${score}%</span><span class="detail-score-lbl">TMDB<br>Score</span></div>` : ''}
+              ${d.tagline ? `<div class="detail-tagline">${escHtml(d.tagline)}</div>` : ''}
+              <div class="detail-actions">
+                <button class="detail-watched-btn${isWatched ? ' is-watched' : ''}" id="detail-watched-btn" onclick="detailToggleWatched('${m.uid}')">
+                  ${isWatched ? '✓ Watched' : 'Mark as Watched'}
+                </button>
+                ${trailer ? `<a class="trailer-btn" href="https://www.youtube.com/watch?v=${trailer.key}" target="_blank" rel="noopener">▶ Trailer</a>` : ''}
+              </div>
+            </div>
+          </div>
+          ${d.overview ? `<div class="detail-section"><div class="detail-section-title">Overview</div><p class="detail-overview">${escHtml(d.overview)}</p></div>` : ''}
+          ${director ? `<div class="detail-section"><div class="detail-section-title">Director</div><p class="detail-director-name">${escHtml(director)}</p></div>` : ''}
+          ${cast.length ? `<div class="detail-section"><div class="detail-section-title">Cast</div><div class="cast-grid">${cast.map(c => `<div class="cast-card">${c.profile_path ? `<img class="cast-photo" src="https://image.tmdb.org/t/p/w185${c.profile_path}" alt="${escHtml(c.name)}">` : '<div class="cast-no-photo"></div>'}<div class="cast-name">${escHtml(c.name)}</div><div class="cast-char">${escHtml(c.character)}</div></div>`).join('')}</div></div>` : ''}
+          ${genres.length ? `<div class="detail-section"><div class="detail-section-title">Genres</div><div class="genre-tags">${genres.map(g => `<span class="genre-tag">${escHtml(g)}</span>`).join('')}</div></div>` : ''}
+        </div>
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="detail-view"><div class="detail-backdrop-wrap"><div class="detail-backdrop"></div><button class="back-btn" onclick="closeDetail()">← Back</button></div><div class="detail-content"><p class="detail-error">Could not load film details.</p></div></div>`;
+  }
+}
+
+function closeDetail() {
+  document.getElementById('view-detail').classList.add('hidden');
+  if (currentView === 'collection') {
+    document.getElementById('view-collection').classList.remove('hidden');
+  } else {
+    document.getElementById('view-tonight').classList.remove('hidden');
+  }
+  window.scrollTo(0, 0);
+}
+
+async function detailToggleWatched(uid) {
+  await toggleWatched(uid);
+  const m = movies.find(m => m.uid === uid);
+  if (!m) return;
+  const btn = document.getElementById('detail-watched-btn');
+  if (!btn) return;
+  const isWatched = m.watched === 'true';
+  btn.textContent = isWatched ? '✓ Watched' : 'Mark as Watched';
+  btn.classList.toggle('is-watched', isWatched);
 }
 
 loadMovies();
