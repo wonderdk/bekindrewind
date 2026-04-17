@@ -252,6 +252,7 @@ function getFiltered() {
   const q = document.getElementById('search').value.toLowerCase();
   let filtered = movies.filter(m => {
     if (unwatched && m.watched === 'true') return false;
+    if (m.hidden === 'true') return false;
     if (filter !== 'all' && m.format !== filter) return false;
     if (q && !m.title.toLowerCase().includes(q) && !m.director.toLowerCase().includes(q)) return false;
     if (genre !== 'all' && !m.genre_ids?.split('|').includes(genre)) return false;
