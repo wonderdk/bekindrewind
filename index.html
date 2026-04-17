@@ -161,6 +161,7 @@ async function loadMovies() {
     movies = parseCSV(text);
     document.getElementById('total').textContent = movies.length;
     renderGrid();
+    populateGenres();
   } catch(e) {
     document.getElementById('grid').innerHTML = '<p style="color:#556080;padding:20px">Could not load collection.</p>';
   }
