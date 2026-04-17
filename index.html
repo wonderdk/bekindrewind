@@ -120,6 +120,7 @@
 
 <script>
 const CSV_URL = 'https://raw.githubusercontent.com/wonderdk/bekindrewind/main/movies.csv';
+const TMDB_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIxZTY3N2ZiMTVjMGM4ZDBkNTMzNjQzMGYxNmNlOTFmMiIsIm5iZiI6MTc3NjQxMjk3Mi4zMDIsInN1YiI6IjY5ZTFlOTJjNmJlM2VmOWRmZThiN2I1MCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.LmxBN4pTZr1OsghaHWA2LkbrqJrGNqftKmyQ1ZUNOQA';
 let movies = [];
 let filter = 'all';
 let tonight = new Set(JSON.parse(localStorage.getItem('tonight') || '[]'));
@@ -142,10 +143,28 @@ async function loadMovies() {
     const text = await res.text();
     movies = parseCSV(text);
     document.getElementById('total').textContent = movies.length;
+    await fetchPosters();
     renderGrid();
   } catch(e) {
     document.getElementById('grid').innerHTML = '<p style="color:#556080;padding:20px">Could not load collection.</p>';
   }
+}
+
+async function fetchPosters() {
+  const promises = movies.map(async m => {
+    if (m.poster_url || !m.imdb_id) return;
+    try {
+      const res = await fetch(`https://api.themoviedb.org/3/find/${m.imdb_id}?external_source=imdb_id`, {
+        headers: { Authorization: `Bearer ${TMDB_TOKEN}` }
+      });
+      const data = await res.json();
+      const result = data.movie_results?.[0];
+      if (result?.poster_path) {
+        m.poster_url = `https://image.tmdb.org/t/p/w300${result.poster_path}`;
+      }
+    } catch(e) {}
+  });
+  await Promise.all(promises);
 }
 
 function fmtClass(f) { return 'fmt-' + f.replace(' ',''); }
