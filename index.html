@@ -160,37 +160,10 @@ async function loadMovies() {
     const text = await res.text();
     movies = parseCSV(text);
     document.getElementById('total').textContent = movies.length;
-    await fetchPosters();
     renderGrid();
   } catch(e) {
     document.getElementById('grid').innerHTML = '<p style="color:#556080;padding:20px">Could not load collection.</p>';
   }
-}
-
-async function fetchPosters() {
-  const batchSize = 10;
-  for (let i = 0; i < movies.length; i += batchSize) {
-    const batch = movies.slice(i, i + batchSize);
-    await Promise.all(batch.map(async m => {
-      if (m.poster_url || !m.imdb_id) return;
-      try {
-        const res = await fetch(`https://api.themoviedb.org/3/find/${m.imdb_id}?external_source=imdb_id`, {
-          headers: { Authorization: `Bearer ${TMDB_TOKEN}` }
-        });
-        const data = await res.json();
-        const result = data.movie_results?.[0];
-        if (result?.poster_path) {
-          m.poster_url = `https://image.tmdb.org/t/p/w300${result.poster_path}`;
-        }
-        if (result?.genre_ids) {
-          m.genre_ids = result.genre_ids.join('|');
-        }
-      } catch(e) {}
-    }));
-    renderGrid();
-    await new Promise(r => setTimeout(r, 300));
-  }
-  populateGenres();
 }
 
 function fmtClass(f) { return 'fmt-' + f.replace(' ',''); }
@@ -210,6 +183,7 @@ function getFiltered() {
 function setGenre(val) {
   genre = val;
   renderGrid();
+ populateGenres();
 }
 
 function populateGenres() {
