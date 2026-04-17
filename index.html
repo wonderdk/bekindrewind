@@ -20,7 +20,7 @@
   .badge{position:absolute;top:2px;right:2px;background:#FFD600;color:#003087;font-size:9px;font-weight:700;min-width:14px;height:14px;border-radius:7px;display:none;align-items:center;justify-content:center;padding:0 3px}
   .stat{color:#9BA3C4;font-size:12px}
   .stat strong{color:#FFD600}
-  .toolbar{background:#1a2240;padding:10px 24px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #2a3460}
+  .toolbar{background:#1a2240;padding:10px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;border-bottom:1px solid #2a3460;}
   .search{background:#0f1628;border:1px solid #2a3460;border-radius:4px;padding:7px 12px;color:#fff;font-size:13px;width:260px;outline:none}
   .search::placeholder{color:#556080}
   .toolbar-right{display:flex;align-items:center;gap:6px;margin-left:auto}
@@ -73,6 +73,16 @@
   .tonight-remove{background:transparent;border:none;color:#2a3460;cursor:pointer;font-size:18px;line-height:1;padding:2px 4px}
   .tonight-remove:hover{color:#9BA3C4}
   .hidden{display:none}
+  @media(max-width:600px){
+  .bb-logo-text{font-size:13px;}
+  .bb-nav-item{font-size:12px;padding:5px 10px;}
+  .bb-header{padding:0 12px;}
+  .toolbar{padding:8px 12px;}
+  .bb-search{width:100%;max-width:100%;}
+  .toolbar select{flex:1;min-width:0;}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}
+  .unwatched-label{font-size:11px;}
+}
 </style>
 </head>
 <body>
