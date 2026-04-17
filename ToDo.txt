@@ -1,0 +1,7 @@
+Fold box set ud, me giv et icon for at det er del af et box set., 
+
+Lav sorting mekanisme
+
+Favicon - blockbuster ikon
+
+Lav format til dropdown
