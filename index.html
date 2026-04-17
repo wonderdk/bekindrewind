@@ -22,10 +22,9 @@
   .toolbar{background:#1a2240;padding:10px 24px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #2a3460}
   .search{background:#0f1628;border:1px solid #2a3460;border-radius:4px;padding:7px 12px;color:#fff;font-size:13px;width:260px;outline:none}
   .search::placeholder{color:#556080}
-  .filters{display:flex;gap:6px;margin-left:auto}
-  .filter{background:transparent;border:1px solid #2a3460;color:#9BA3C4;font-size:12px;padding:5px 12px;border-radius:3px;cursor:pointer}
-  .filter:hover{color:#fff;border-color:#4a5580}
-  .filter.active{background:#FFD600;color:#003087;border-color:#FFD600;font-weight:500}
+  .toolbar-right{display:flex;align-items:center;gap:6px;margin-left:auto}
+  .toolbar-select{background:#0f1628;border:1px solid #2a3460;color:#9BA3C4;font-size:12px;padding:5px 10px;border-radius:3px;cursor:pointer;outline:none}
+  .unwatched-label{display:flex;align-items:center;gap:5px;color:#9BA3C4;font-size:12px;cursor:pointer;white-space:nowrap;padding:0 4px}
   .body{padding:24px}
   .shelf-label{display:flex;align-items:center;gap:12px;margin-bottom:14px}
   .shelf-title{color:#FFD600;font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase}
@@ -90,15 +89,20 @@
 <div id="view-collection">
   <div class="toolbar">
     <input class="search" type="text" placeholder="Search titles, directors..." id="search" oninput="renderGrid()">
-    <select id="genre-select" onchange="setGenre(this.value)" style="background:#0f1628;border:1px solid #2a3460;color:#9BA3C4;font-size:12px;padding:5px 10px;border-radius:3px;cursor:pointer;outline:none;">
-      <option value="all">All genres</option>
+    <div class="toolbar-right">
+      <select id="format-select" class="toolbar-select" onchange="setFormat(this.value)">
+        <option value="all">All formats</option>
+        <option value="DVD">DVD</option>
+        <option value="Blu-ray">Blu-ray</option>
+        <option value="4K">4K</option>
       </select>
-    <div class="filters">
-      <button class="filter active" onclick="setFilter('all',this)">All</button>
-      <button class="filter" onclick="setFilter('DVD',this)">DVD</button>
-      <button class="filter" onclick="setFilter('Blu-ray',this)">Blu-ray</button>
-      <button class="filter" onclick="setFilter('4K',this)">4K</button>
-      <button class="filter" onclick="setFilter('unwatched',this)">Unwatched</button>
+      <select id="genre-select" class="toolbar-select" onchange="setGenre(this.value)">
+        <option value="all">All genres</option>
+      </select>
+      <label class="unwatched-label">
+        <input type="checkbox" id="unwatched-cb" onchange="setUnwatched(this.checked)" style="accent-color:#FFD600;cursor:pointer">
+        Unwatched
+      </label>
     </div>
   </div>
   <div class="body">
@@ -127,6 +131,7 @@ const TMDB_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIxZTY3N2ZiMTVjMGM4ZDBkNTMzNjQ
 let movies = [];
 let filter = 'all';
 let genre = 'all';
+let unwatched = false;
 let tonight = new Set(JSON.parse(localStorage.getItem('tonight') || '[]'));
 let currentView = 'collection';
 
@@ -173,8 +178,8 @@ function fmtLabel(f) { return f === 'Blu-ray' ? 'BD' : f; }
 function getFiltered() {
   const q = document.getElementById('search').value.toLowerCase();
   return movies.filter(m => {
-    if (filter === 'unwatched' && m.watched === 'true') return false;
-    if (filter !== 'all' && filter !== 'unwatched' && m.format !== filter) return false;
+    if (unwatched && m.watched === 'true') return false;
+    if (filter !== 'all' && m.format !== filter) return false;
     if (q && !m.title.toLowerCase().includes(q) && !m.director.toLowerCase().includes(q)) return false;
     if (genre !== 'all' && !m.genre_ids?.split('|').includes(genre)) return false;
     return true;
@@ -184,7 +189,7 @@ function getFiltered() {
 function setGenre(val) {
   genre = val;
   renderGrid();
- populateGenres();
+  populateGenres();
 }
 
 function populateGenres() {
@@ -205,7 +210,7 @@ function populateGenres() {
     select.appendChild(opt);
   });
 }
- 
+
 function renderGrid() {
   const visible = getFiltered();
   document.getElementById('shelf-count').textContent = visible.length + ' titles';
@@ -280,10 +285,13 @@ function clearTonight() {
   renderTonight();
 }
 
-function setFilter(f, btn) {
-  filter = f;
-  document.querySelectorAll('.filter').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+function setFormat(val) {
+  filter = val;
+  renderGrid();
+}
+
+function setUnwatched(checked) {
+  unwatched = checked;
   renderGrid();
 }
 
