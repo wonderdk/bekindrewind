@@ -167,16 +167,17 @@ async function fetchPosters() {
         const data = await res.json();
         const result = data.movie_results?.[0];
         if (result?.poster_path) {
-        m.poster_url = `https://image.tmdb.org/t/p/w300${result.poster_path}`;
-      }
-if (result?.genre_ids) {
-  m.genre_ids = result.genre_ids.join('|');
-}
+          m.poster_url = `https://image.tmdb.org/t/p/w300${result.poster_path}`;
+        }
+        if (result?.genre_ids) {
+          m.genre_ids = result.genre_ids.join('|');
+        }
       } catch(e) {}
     }));
     renderGrid();
     await new Promise(r => setTimeout(r, 300));
   }
+  populateGenres();
 }
 
 function fmtClass(f) { return 'fmt-' + f.replace(' ',''); }
@@ -305,7 +306,7 @@ function switchView(v) {
   renderTonight();
 }
 
-loadMovies().then(populateGenres);
+loadMovies();
 </script>
 </body>
 </html>
