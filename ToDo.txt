@@ -8,3 +8,5 @@ Add view page for each title
 Show selected genre in drop down
 
 Reset filters
+
+hvad er dette for en film?
