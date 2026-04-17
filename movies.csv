@@ -1,4 +1,4 @@
-title,year,format,barcode,imdb_id,runtime,director,watched,poster_url
+title,year,format,barcode,imdb_id,runtime,director,watched,poster_url, box_set
 Schindler's List,1993,DVD,5050582207774,tt0108052,187,Steven Spielberg,true,
 The Departed,2006,Blu-ray,7321970132885,tt0407887,151,Martin Scorsese,true,
 Lawrence of Arabia,1962,4K,43396406964,tt0056172,227,David Lean,false,
