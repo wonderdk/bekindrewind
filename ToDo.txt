@@ -5,3 +5,9 @@ Lav sorting mekanisme
 Favicon - blockbuster ikon
 
 Lav format til dropdown
+
+Add scale function for number of titles per row or size of thumb.
+
+Add view page for each title
+
+Fix url so also small letters work
