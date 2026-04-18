@@ -93,12 +93,87 @@
             z-index: 5;
             pointer-events: none;
         }
+
+        #movieTitle {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: bold;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 20px;
+            border: 1px solid #FFD700;
+            z-index: 5;
+            pointer-events: none;
+            display: none;
+            white-space: nowrap;
+            max-width: 80vw;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #detailOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            pointer-events: all;
+        }
+
+        #detailContent {
+            background: #0f1628;
+            color: #ffffff;
+            padding: 30px;
+            border: 3px solid #FFD600;
+            border-radius: 8px;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 0 20px rgba(255, 214, 0, 0.3);
+        }
+
+        #detailContent img {
+            width: 100%;
+            max-height: 250px;
+            object-fit: cover;
+            border: 2px solid #FFD600;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        #detailContent h2 {
+            color: #FFD600;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+
+        #detailContent p {
+            margin-bottom: 8px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        #detailContent strong {
+            color: #FFD600;
+        }
     </style>
 </head>
 <body>
     <a id="backButton" href="index.html">← Back to Collection</a>
     <div id="crosshair"></div>
     <div id="infoText">Click to look around | WASD to move | ESC to release mouse</div>
+    <div id="movieTitle"></div>
+    <div id="detailOverlay">
+        <div id="detailContent"></div>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
@@ -126,10 +201,10 @@
         const FLOOR_Y = 0;
 
         // Colors (Blockbuster blue/yellow)
-        const BLOCKBUSTER_BLUE = 0x003366;
-        const BLOCKBUSTER_YELLOW = 0xFFD700;
-        const TEAL = 0x008080;
-        const PURPLE = 0x4B0082;
+        const BLOCKBUSTER_BLUE = 0x003087;
+        const BLOCKBUSTER_YELLOW = 0xFFD600;
+        const TEAL = 0x1a3a3a;
+        const PURPLE = 0x2a1a3a;
         const DARK_FLOOR = 0x1a1a1a;
 
         // Lighting
@@ -334,9 +409,9 @@
             canvas2D.width = 256;
             canvas2D.height = 128;
             const ctx = canvas2D.getContext('2d');
-            ctx.fillStyle = BLOCKBUSTER_BLUE.toString(16).padStart(6, '0');
+            ctx.fillStyle = '#003087';
             ctx.fillRect(0, 0, 256, 128);
-            ctx.fillStyle = '#FFD700';
+            ctx.fillStyle = '#FFD600';
             ctx.font = 'bold 48px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -350,6 +425,127 @@
             sign.castShadow = true;
             sign.receiveShadow = true;
             scene.add(sign);
+        });
+
+        // Movie posters data and setup
+        let movies = [];
+        let posterObjects = [];
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let hoveredPoster = null;
+
+        async function loadMovies() {
+            try {
+                const url = `https://raw.githubusercontent.com/wonderdk/bekindrewind/main/movies.csv?t=${Date.now()}`;
+                const response = await fetch(url);
+                const csv = await response.text();
+                const lines = csv.trim().split('\n');
+                const headers = lines[0].split(',').map(h => h.trim());
+
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+
+                    const values = line.split(',').map(v => v.trim().replace(/^["']|["']$/g, ''));
+                    const movie = {};
+                    headers.forEach((header, idx) => {
+                        movie[header] = values[idx] || '';
+                    });
+
+                    if (movie.hidden === 'true' || !movie.poster_url) continue;
+
+                    movies.push(movie);
+                }
+
+                // Group by first genre
+                const genreMap = {};
+                genres.forEach(g => genreMap[g] = []);
+
+                movies.forEach(movie => {
+                    const firstGenre = movie.genres ? movie.genres.split('|')[0].trim() : '';
+                    if (firstGenre && genreMap[firstGenre]) {
+                        genreMap[firstGenre].push(movie);
+                    }
+                });
+
+                // Create poster planes for each genre
+                genres.forEach((genre, genreIndex) => {
+                    const xPos = -STORE_WIDTH / 2 + shelfSpacing * (genreIndex + 1);
+                    const moviesInGenre = genreMap[genre];
+
+                    moviesInGenre.forEach((movie, movieIndex) => {
+                        // Determine shelf level (0-3, 4 levels)
+                        const level = movieIndex % 4;
+                        const shelfY = 1 + level * 2;
+                        const posterIndex = Math.floor(movieIndex / 4);
+                        const maxPostersPerShelf = 3;
+                        const posterX = posterIndex - (maxPostersPerShelf - 1) / 2;
+
+                        const posterGeometry = new THREE.PlaneGeometry(0.35, 0.5);
+                        const posterTexture = new THREE.TextureLoader();
+                        const posterMaterial = new THREE.MeshLambertMaterial({
+                            map: posterTexture.load(movie.poster_url, undefined, undefined, () => {})
+                        });
+
+                        const poster = new THREE.Mesh(posterGeometry, posterMaterial);
+                        poster.position.set(xPos + posterX * 0.5, shelfY, 0.95);
+                        poster.castShadow = true;
+                        poster.receiveShadow = true;
+                        poster.userData = { movie };
+                        scene.add(poster);
+                        posterObjects.push(poster);
+                    });
+                });
+            } catch (error) {
+                console.error('Failed to load movies:', error);
+            }
+        }
+
+        loadMovies();
+
+        function showMovieTitle(movie) {
+            const titleEl = document.getElementById('movieTitle');
+            titleEl.textContent = movie.title || 'Untitled';
+            titleEl.style.display = 'block';
+        }
+
+        function hideMovieTitle() {
+            document.getElementById('movieTitle').style.display = 'none';
+        }
+
+        function showDetailOverlay(movie) {
+            document.exitPointerLock?.();
+            const overlay = document.getElementById('detailOverlay');
+            const content = document.getElementById('detailContent');
+
+            const html = `
+                <img src="${movie.poster_url}" alt="${movie.title}" onerror="this.style.display='none'">
+                <h2>${movie.title || 'Untitled'}</h2>
+                ${movie.year ? `<p><strong>Year:</strong> ${movie.year}</p>` : ''}
+                ${movie.format ? `<p><strong>Format:</strong> ${movie.format}</p>` : ''}
+                ${movie.director ? `<p><strong>Director:</strong> ${movie.director}</p>` : ''}
+                ${movie.runtime ? `<p><strong>Runtime:</strong> ${movie.runtime}</p>` : ''}
+                ${movie.genres ? `<p><strong>Genres:</strong> ${movie.genres}</p>` : ''}
+            `;
+
+            content.innerHTML = html;
+            overlay.style.display = 'flex';
+        }
+
+        function hideDetailOverlay() {
+            document.getElementById('detailOverlay').style.display = 'none';
+        }
+
+        document.getElementById('detailOverlay').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('detailOverlay')) {
+                hideDetailOverlay();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                hideDetailOverlay();
+            }
         });
 
         // Player movement
@@ -373,13 +569,21 @@
         let isPointerLocked = false;
 
         canvas.addEventListener('click', () => {
-            canvas.requestPointerLock?.() ||
-            canvas.mozRequestPointerLock?.() ||
-            canvas.webkitRequestPointerLock?.();
+            // Check if hovering over a poster
+            if (hoveredPoster && hoveredPoster.userData.movie) {
+                showDetailOverlay(hoveredPoster.userData.movie);
+            } else {
+                canvas.requestPointerLock?.() ||
+                canvas.mozRequestPointerLock?.() ||
+                canvas.webkitRequestPointerLock?.();
+            }
         });
 
         document.addEventListener('pointerlockchange', () => {
             isPointerLocked = document.pointerLockElement === canvas;
+            if (document.getElementById('detailOverlay').style.display === 'flex') {
+                document.exitPointerLock?.();
+            }
         });
 
         document.addEventListener('mousemove', (e) => {
@@ -475,6 +679,23 @@
             camera.rotation.order = 'YXZ';
             camera.rotation.y = yaw;
             camera.rotation.x = pitch;
+
+            // Raycasting for poster hover
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+            const intersects = raycaster.intersectObjects(posterObjects);
+
+            if (intersects.length > 0) {
+                const poster = intersects[0].object;
+                if (hoveredPoster !== poster) {
+                    hoveredPoster = poster;
+                    showMovieTitle(poster.userData.movie);
+                }
+            } else {
+                if (hoveredPoster) {
+                    hoveredPoster = null;
+                    hideMovieTitle();
+                }
+            }
 
             renderer.render(scene, camera);
         }
