@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blockbuster Store - 3D</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #000;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #backButton {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #FFD700;
+            border: 2px solid #FFD700;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            border-radius: 4px;
+            z-index: 10;
+            transition: all 0.3s;
+        }
+
+        #backButton:hover {
+            background: #FFD700;
+            color: #000;
+        }
+
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30px;
+            height: 30px;
+            border: 2px solid rgba(255, 215, 0, 0.5);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 215, 0, 0.5);
+        }
+
+        #crosshair::before {
+            width: 2px;
+            height: 10px;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        #crosshair::after {
+            width: 10px;
+            height: 2px;
+            left: -15px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        #infoText {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: #FFD700;
+            font-size: 14px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px;
+            border: 1px solid #FFD700;
+            z-index: 5;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <a id="backButton" href="index.html">← Back to Collection</a>
+    <div id="crosshair"></div>
+    <div id="infoText">WASD to move • Mouse to look • Click to lock • ESC to unlock</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a2e);
+        scene.fog = new THREE.Fog(0x1a1a2e, 120, 200);
+
+        const canvas = document.createElement('canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFShadowShadowMap;
+        document.body.appendChild(canvas);
+
+        // Camera setup
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 2, -25);
+
+        // Store dimensions
+        const STORE_WIDTH = 60;
+        const STORE_DEPTH = 40;
+        const STORE_HEIGHT = 14;
+        const CEILING_HEIGHT = 10;
+        const FLOOR_Y = 0;
+
+        // Colors (Blockbuster blue/yellow)
+        const BLOCKBUSTER_BLUE = 0x003366;
+        const BLOCKBUSTER_YELLOW = 0xFFD700;
+        const TEAL = 0x008080;
+        const PURPLE = 0x4B0082;
+        const DARK_FLOOR = 0x1a1a1a;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        // Fluorescent lights
+        const lightPositions = [
+            { x: -15, z: -15 },
+            { x: 0, z: -15 },
+            { x: 15, z: -15 },
+            { x: -15, z: 5 },
+            { x: 0, z: 5 },
+            { x: 15, z: 5 }
+        ];
+
+        lightPositions.forEach(pos => {
+            const light = new THREE.PointLight(0xffffff, 0.8, 50);
+            light.position.set(pos.x, CEILING_HEIGHT - 0.5, pos.z);
+            light.castShadow = true;
+            light.shadow.mapSize.width = 512;
+            light.shadow.mapSize.height = 512;
+            scene.add(light);
+        });
+
+        // Floor with geometric carpet pattern
+        const floorGeometry = new THREE.PlaneGeometry(STORE_WIDTH, STORE_DEPTH);
+        const floorMaterial = new THREE.MeshLambertMaterial({ color: DARK_FLOOR });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // Carpet pattern (geometric tiles)
+        const carpetPattern = new THREE.Group();
+        const tileSize = 5;
+        for (let x = -STORE_WIDTH / 2; x < STORE_WIDTH / 2; x += tileSize) {
+            for (let z = -STORE_DEPTH / 2; z < STORE_DEPTH / 2; z += tileSize) {
+                const tileGeometry = new THREE.PlaneGeometry(tileSize - 0.1, tileSize - 0.1);
+                const color = ((Math.floor(x / tileSize) + Math.floor(z / tileSize)) % 2 === 0) ? TEAL : PURPLE;
+                const tileMaterial = new THREE.MeshLambertMaterial({ color });
+                const tile = new THREE.Mesh(tileGeometry, tileMaterial);
+                tile.position.set(x + tileSize / 2, 0.01, z + tileSize / 2);
+                tile.rotation.x = -Math.PI / 2;
+                carpetPattern.add(tile);
+            }
+        }
+        scene.add(carpetPattern);
+
+        // Ceiling
+        const ceilingGeometry = new THREE.PlaneGeometry(STORE_WIDTH, STORE_DEPTH);
+        const ceilingMaterial = new THREE.MeshLambertMaterial({ color: 0xcccccc });
+        const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
+        ceiling.position.y = CEILING_HEIGHT;
+        ceiling.rotation.x = Math.PI / 2;
+        ceiling.receiveShadow = true;
+        scene.add(ceiling);
+
+        // Ceiling tiles (drop ceiling)
+        const ceilingTiles = new THREE.Group();
+        const tileSizeC = 6;
+        for (let x = -STORE_WIDTH / 2; x < STORE_WIDTH / 2; x += tileSizeC) {
+            for (let z = -STORE_DEPTH / 2; z < STORE_DEPTH / 2; z += tileSizeC) {
+                const tileGeometry = new THREE.PlaneGeometry(tileSizeC - 0.15, tileSizeC - 0.15);
+                const tileMaterial = new THREE.MeshLambertMaterial({ color: 0xaaaaaa });
+                const tile = new THREE.Mesh(tileGeometry, tileMaterial);
+                tile.position.set(x + tileSizeC / 2, CEILING_HEIGHT - 0.05, z + tileSizeC / 2);
+                tile.rotation.x = Math.PI / 2;
+                ceilingTiles.add(tile);
+            }
+        }
+        scene.add(ceilingTiles);
+
+        // Walls
+        const wallMaterial = new THREE.MeshLambertMaterial({ color: BLOCKBUSTER_BLUE });
+
+        // Back wall
+        const backWallGeometry = new THREE.PlaneGeometry(STORE_WIDTH, STORE_HEIGHT);
+        const backWall = new THREE.Mesh(backWallGeometry, wallMaterial);
+        backWall.position.z = STORE_DEPTH / 2;
+        backWall.position.y = STORE_HEIGHT / 2;
+        backWall.castShadow = true;
+        backWall.receiveShadow = true;
+        scene.add(backWall);
+
+        // Front wall (with opening for entrance)
+        const frontWallLeft = new THREE.Mesh(
+            new THREE.PlaneGeometry(STORE_WIDTH / 2 - 5, STORE_HEIGHT),
+            wallMaterial
+        );
+        frontWallLeft.position.set(-STORE_WIDTH / 4 - 2.5, STORE_HEIGHT / 2, -STORE_DEPTH / 2);
+        frontWallLeft.castShadow = true;
+        frontWallLeft.receiveShadow = true;
+        scene.add(frontWallLeft);
+
+        const frontWallRight = new THREE.Mesh(
+            new THREE.PlaneGeometry(STORE_WIDTH / 2 - 5, STORE_HEIGHT),
+            wallMaterial
+        );
+        frontWallRight.position.set(STORE_WIDTH / 4 + 2.5, STORE_HEIGHT / 2, -STORE_DEPTH / 2);
+        frontWallRight.castShadow = true;
+        frontWallRight.receiveShadow = true;
+        scene.add(frontWallRight);
+
+        // Side walls
+        const sideWallMaterial = new THREE.MeshLambertMaterial({ color: 0x002244 });
+        const leftWallGeometry = new THREE.PlaneGeometry(STORE_DEPTH, STORE_HEIGHT);
+        const leftWall = new THREE.Mesh(leftWallGeometry, sideWallMaterial);
+        leftWall.position.x = -STORE_WIDTH / 2;
+        leftWall.position.y = STORE_HEIGHT / 2;
+        leftWall.rotation.y = Math.PI / 2;
+        leftWall.castShadow = true;
+        leftWall.receiveShadow = true;
+        scene.add(leftWall);
+
+        const rightWall = new THREE.Mesh(leftWallGeometry, sideWallMaterial);
+        rightWall.position.x = STORE_WIDTH / 2;
+        rightWall.position.y = STORE_HEIGHT / 2;
+        rightWall.rotation.y = -Math.PI / 2;
+        rightWall.castShadow = true;
+        rightWall.receiveShadow = true;
+        scene.add(rightWall);
+
+        // Front counter
+        const counterGeometry = new THREE.BoxGeometry(15, 1.2, 2);
+        const counterMaterial = new THREE.MeshLambertMaterial({ color: BLOCKBUSTER_YELLOW });
+        const counter = new THREE.Mesh(counterGeometry, counterMaterial);
+        counter.position.set(0, 0.6, -STORE_DEPTH / 2 + 3);
+        counter.castShadow = true;
+        counter.receiveShadow = true;
+        scene.add(counter);
+
+        // TV in corner
+        const tvGeometry = new THREE.BoxGeometry(3, 2.5, 0.3);
+        const tvMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+        const tv = new THREE.Mesh(tvGeometry, tvMaterial);
+        tv.position.set(STORE_WIDTH / 2 - 3, 2, -STORE_DEPTH / 2 + 3);
+        tv.castShadow = true;
+        tv.receiveShadow = true;
+        scene.add(tv);
+
+        // Shelves and aisles
+        const genres = ['Horror', 'Romance', 'Action', 'Drama', 'Thriller', 'Sci-Fi'];
+        const shelfSpacing = STORE_WIDTH / (genres.length + 1);
+        const shelfColliders = [];
+
+        genres.forEach((genre, index) => {
+            const xPos = -STORE_WIDTH / 2 + shelfSpacing * (index + 1);
+
+            // Create shelf unit (simple box structure)
+            const shelfGroup = new THREE.Group();
+            shelfGroup.position.set(xPos, 0, 0);
+
+            // Vertical supports
+            const supportGeometry = new THREE.BoxGeometry(0.3, CEILING_HEIGHT - 2, 0.3);
+            const supportMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
+
+            const leftSupport = new THREE.Mesh(supportGeometry, supportMaterial);
+            leftSupport.position.set(-1.5, (CEILING_HEIGHT - 2) / 2, 0);
+            leftSupport.castShadow = true;
+            leftSupport.receiveShadow = true;
+            shelfGroup.add(leftSupport);
+
+            const rightSupport = new THREE.Mesh(supportGeometry, supportMaterial);
+            rightSupport.position.set(1.5, (CEILING_HEIGHT - 2) / 2, 0);
+            rightSupport.castShadow = true;
+            rightSupport.receiveShadow = true;
+            shelfGroup.add(rightSupport);
+
+            // Shelves (4 levels)
+            const shelfMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+            for (let level = 0; level < 4; level++) {
+                const shelfGeometry = new THREE.BoxGeometry(3.5, 0.3, 2);
+                const shelf = new THREE.Mesh(shelfGeometry, shelfMaterial);
+                shelf.position.y = 1 + level * 2;
+                shelf.castShadow = true;
+                shelf.receiveShadow = true;
+                shelfGroup.add(shelf);
+            }
+
+            // Back panel
+            const backPanelGeometry = new THREE.BoxGeometry(3.5, CEILING_HEIGHT - 2, 0.2);
+            const backPanelMaterial = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+            const backPanel = new THREE.Mesh(backPanelGeometry, backPanelMaterial);
+            backPanel.position.set(0, (CEILING_HEIGHT - 2) / 2, -1.2);
+            backPanel.castShadow = true;
+            backPanel.receiveShadow = true;
+            shelfGroup.add(backPanel);
+
+            scene.add(shelfGroup);
+
+            // Collision box
+            shelfColliders.push({
+                position: new THREE.Vector3(xPos, 0, 0),
+                width: 3.5,
+                height: CEILING_HEIGHT - 2,
+                depth: 2
+            });
+
+            // Genre sign above shelf
+            const canvas2D = document.createElement('canvas');
+            canvas2D.width = 256;
+            canvas2D.height = 128;
+            const ctx = canvas2D.getContext('2d');
+            ctx.fillStyle = BLOCKBUSTER_BLUE.toString(16).padStart(6, '0');
+            ctx.fillRect(0, 0, 256, 128);
+            ctx.fillStyle = '#FFD700';
+            ctx.font = 'bold 48px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(genre, 128, 64);
+
+            const texture = new THREE.CanvasTexture(canvas2D);
+            const signGeometry = new THREE.PlaneGeometry(4, 1.5);
+            const signMaterial = new THREE.MeshLambertMaterial({ map: texture });
+            const sign = new THREE.Mesh(signGeometry, signMaterial);
+            sign.position.set(xPos, CEILING_HEIGHT - 1.5, 1.5);
+            sign.castShadow = true;
+            sign.receiveShadow = true;
+            scene.add(sign);
+        });
+
+        // Player movement
+        const keys = {};
+        const moveVector = new THREE.Vector3();
+        const velocity = new THREE.Vector3();
+        const playerRadius = 0.4;
+        let isWalking = false;
+
+        window.addEventListener('keydown', e => {
+            keys[e.key.toLowerCase()] = true;
+        });
+
+        window.addEventListener('keyup', e => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        // Mouse look with pointer lock
+        let yaw = 0;
+        let pitch = 0;
+        let isPointerLocked = false;
+
+        canvas.addEventListener('click', () => {
+            canvas.requestPointerLock?.() ||
+            canvas.mozRequestPointerLock?.() ||
+            canvas.webkitRequestPointerLock?.();
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+            isPointerLocked = document.pointerLockElement === canvas;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isPointerLocked) {
+                yaw -= e.movementX * 0.005;
+                pitch -= e.movementY * 0.005;
+                pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.exitPointerLock?.();
+            }
+        });
+
+        // Collision detection
+        function checkCollision(testPos) {
+            for (let collider of shelfColliders) {
+                const dx = testPos.x - collider.position.x;
+                const dz = testPos.z - collider.position.z;
+
+                const minX = -collider.width / 2 - playerRadius;
+                const maxX = collider.width / 2 + playerRadius;
+                const minZ = -collider.depth / 2 - playerRadius;
+                const maxZ = collider.depth / 2 + playerRadius;
+
+                if (dx > minX && dx < maxX && dz > minZ && dz < maxZ) {
+                    return true;
+                }
+            }
+
+            // Boundary collision
+            const boundaryPadding = playerRadius + 0.5;
+            if (testPos.x < -STORE_WIDTH / 2 + boundaryPadding ||
+                testPos.x > STORE_WIDTH / 2 - boundaryPadding ||
+                testPos.z < -STORE_DEPTH / 2 + boundaryPadding ||
+                testPos.z > STORE_DEPTH / 2 - boundaryPadding) {
+                return true;
+            }
+
+            return false;
+        }
+
+        // Animation loop
+        let bobTime = 0;
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const deltaTime = Math.min(clock.getDelta(), 0.1);
+
+            // Movement input
+            moveVector.set(0, 0, 0);
+            if (keys['w']) moveVector.z -= 1;
+            if (keys['s']) moveVector.z += 1;
+            if (keys['a']) moveVector.x -= 1;
+            if (keys['d']) moveVector.x += 1;
+
+            isWalking = moveVector.length() > 0;
+
+            if (moveVector.length() > 0) {
+                moveVector.normalize();
+
+                // Rotate movement based on camera direction
+                const angle = yaw + Math.atan2(moveVector.x, moveVector.z);
+                const speed = 12;
+                velocity.x = Math.sin(angle) * speed * deltaTime;
+                velocity.z = Math.cos(angle) * speed * deltaTime;
+
+                // Test collision
+                const testPos = camera.position.clone();
+                testPos.x += velocity.x;
+                testPos.z += velocity.z;
+
+                if (!checkCollision(testPos)) {
+                    camera.position.x += velocity.x;
+                    camera.position.z += velocity.z;
+                }
+            }
+
+            // Camera bob while walking
+            if (isWalking) {
+                bobTime += deltaTime * 5;
+                camera.position.y = 2 + Math.sin(bobTime) * 0.1;
+            } else {
+                camera.position.y = 2;
+                bobTime = 0;
+            }
+
+            // Update camera rotation
+            camera.rotation.order = 'YXZ';
+            camera.rotation.y = yaw;
+            camera.rotation.x = pitch;
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
