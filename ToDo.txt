@@ -10,3 +10,5 @@ Show selected genre in drop down
 Reset filters
 
 hvad er dette for en film?
+
+Men in black II har forkert poster
