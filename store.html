@@ -203,8 +203,6 @@
         // Colors (Blockbuster blue/yellow)
         const BLOCKBUSTER_BLUE = 0x003087;
         const BLOCKBUSTER_YELLOW = 0xFFD600;
-        const TEAL = 0x1a3a3a;
-        const PURPLE = 0x2a1a3a;
         const DARK_FLOOR = 0x1a1a1a;
 
         // Lighting
@@ -304,7 +302,8 @@
         const backStripeGeometry = new THREE.PlaneGeometry(STORE_WIDTH, 0.4);
         const stripeMaterial = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
         const backStripe = new THREE.Mesh(backStripeGeometry, stripeMaterial);
-        backStripe.position.set(0, STORE_HEIGHT / 2, STORE_DEPTH / 2 + 0.01);
+        backStripe.position.set(0, STORE_HEIGHT / 2, STORE_DEPTH / 2 + 0.02);
+        backStripe.castShadow = true;
         scene.add(backStripe);
 
         // Front wall upper (yellow) - with opening for entrance
@@ -384,13 +383,15 @@
         // Side wall dividing stripes
         const sideStripeGeometry = new THREE.PlaneGeometry(STORE_DEPTH, 0.4);
         const leftStripe = new THREE.Mesh(sideStripeGeometry, stripeMaterial);
-        leftStripe.position.set(-STORE_WIDTH / 2 + 0.01, STORE_HEIGHT / 2, 0);
+        leftStripe.position.set(-STORE_WIDTH / 2 + 0.02, STORE_HEIGHT / 2, 0);
         leftStripe.rotation.y = Math.PI / 2;
+        leftStripe.castShadow = true;
         scene.add(leftStripe);
 
         const rightStripe = new THREE.Mesh(sideStripeGeometry, stripeMaterial);
-        rightStripe.position.set(STORE_WIDTH / 2 - 0.01, STORE_HEIGHT / 2, 0);
+        rightStripe.position.set(STORE_WIDTH / 2 - 0.02, STORE_HEIGHT / 2, 0);
         rightStripe.rotation.y = -Math.PI / 2;
+        rightStripe.castShadow = true;
         scene.add(rightStripe);
 
         // Front counter
@@ -416,11 +417,15 @@
         const shelfColliders = [];
         const aisleCenters = [-20, -12, -4, 4, 12, 20];
         const aisleShelves = {};
+        const wallShelves = { left: [], right: [] };
 
         genres.forEach((genre, index) => {
             const xPos = aisleCenters[index];
+            const shelfLevels = [0.5, 1.5, 2.5, 3.5];
+
+            // Move shelves back - clear first 4 units from entrance (z: -20 to -16)
             const aisleFrontZ = 18;
-            const aisleFrontZZ = -18;
+            const aisleFrontZZ = -14; // Moved back to clear entrance
 
             // Create double-sided shelf unit running front-to-back
             const shelfGroup = new THREE.Group();
@@ -429,7 +434,7 @@
             // Vertical supports (4 posts along the aisle)
             const supportGeometry = new THREE.BoxGeometry(0.3, 2, 0.3);
             const supportMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
-            const supportZPositions = [-12, -4, 4, 12];
+            const supportZPositions = [-10, -2, 6, 14];
 
             supportZPositions.forEach(z => {
                 const support = new THREE.Mesh(supportGeometry, supportMaterial);
@@ -441,12 +446,12 @@
 
             // Shelves (4 levels) - thin shelf extending front to back
             const shelfMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
-            const shelfLevels = [0.5, 1.5, 2.5, 3.5];
 
             shelfLevels.forEach(level => {
-                const shelfGeometry = new THREE.BoxGeometry(0.2, 0.2, 36);
+                const shelfGeometry = new THREE.BoxGeometry(0.2, 0.2, 32);
                 const shelf = new THREE.Mesh(shelfGeometry, shelfMaterial);
                 shelf.position.y = level;
+                shelf.position.z = 2; // Offset to match front/back z range
                 shelf.castShadow = true;
                 shelf.receiveShadow = true;
                 shelfGroup.add(shelf);
@@ -458,7 +463,8 @@
             aisleShelves[genre] = {
                 xPos: xPos,
                 zRange: { min: aisleFrontZZ, max: aisleFrontZ },
-                levels: shelfLevels
+                levels: shelfLevels,
+                isWall: false
             };
 
             // Collision box for the aisle
@@ -466,7 +472,7 @@
                 position: new THREE.Vector3(xPos, 0, 0),
                 width: 1.5,
                 height: 2,
-                depth: 36
+                depth: 32
             });
 
             // Genre sign hanging above aisle at ceiling
@@ -500,6 +506,48 @@
             stripLight.shadow.mapSize.height = 256;
             scene.add(stripLight);
         });
+
+        // Wall shelves on left and right sides - running full length
+        const shelfLevels = [0.5, 1.5, 2.5, 3.5];
+        const wallShelfMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+
+        // Left wall shelves
+        const leftWallShelfGroup = new THREE.Group();
+        leftWallShelfGroup.position.set(-STORE_WIDTH / 2 + 1.5, 0, 0);
+        shelfLevels.forEach(level => {
+            const shelfGeometry = new THREE.BoxGeometry(0.2, 0.2, STORE_DEPTH - 4);
+            const shelf = new THREE.Mesh(shelfGeometry, wallShelfMaterial);
+            shelf.position.y = level;
+            shelf.castShadow = true;
+            shelf.receiveShadow = true;
+            leftWallShelfGroup.add(shelf);
+        });
+        scene.add(leftWallShelfGroup);
+        wallShelves.left = {
+            xPos: -STORE_WIDTH / 2 + 1.5,
+            zRange: { min: -STORE_DEPTH / 2 + 2, max: STORE_DEPTH / 2 - 2 },
+            levels: shelfLevels,
+            isWall: true
+        };
+
+        // Right wall shelves
+        const rightWallShelfGroup = new THREE.Group();
+        rightWallShelfGroup.position.set(STORE_WIDTH / 2 - 1.5, 0, 0);
+        shelfLevels.forEach(level => {
+            const shelfGeometry = new THREE.BoxGeometry(0.2, 0.2, STORE_DEPTH - 4);
+            const shelf = new THREE.Mesh(shelfGeometry, wallShelfMaterial);
+            shelf.position.y = level;
+            shelf.castShadow = true;
+            shelf.receiveShadow = true;
+            rightWallShelfGroup.add(shelf);
+        });
+        scene.add(rightWallShelfGroup);
+        wallShelves.right = {
+            xPos: STORE_WIDTH / 2 - 1.5,
+            zRange: { min: -STORE_DEPTH / 2 + 2, max: STORE_DEPTH / 2 - 2 },
+            levels: shelfLevels,
+            isWall: true
+        };
 
         // Movie posters data and setup
         let movies = [];
@@ -542,7 +590,7 @@
                     }
                 });
 
-                // Create poster planes for each aisle
+                // Create poster planes for aisle shelves
                 genres.forEach((genre) => {
                     const aisle = aisleShelves[genre];
                     if (!aisle) return;
@@ -553,7 +601,6 @@
                     const zSpacing = posterWidth;
                     const levelHeights = [0.5, 1.5, 2.5, 3.5];
 
-                    // Distribute movies across shelves
                     let movieIdx = 0;
                     levelHeights.forEach((levelY) => {
                         // Front side posters (facing -z direction, positive x offset)
@@ -612,6 +659,67 @@
 
                         movieIdx += backMovies.length;
                     });
+                });
+
+                // Distribute remaining movies across wall shelves
+                const posterWidth = 0.35;
+                const posterHeight = 0.52;
+                const zSpacing = posterWidth;
+
+                // Left wall shelves
+                let remainingMovies = movies.slice(genres.length * 120); // Movies not yet placed
+                let movieIdx = 0;
+                shelfLevels.forEach((levelY) => {
+                    let zOffset = wallShelves.left.zRange.min;
+
+                    while (movieIdx < remainingMovies.length && zOffset < wallShelves.left.zRange.max - posterWidth) {
+                        const movie = remainingMovies[movieIdx];
+                        const posterGeometry = new THREE.PlaneGeometry(posterWidth, posterHeight);
+                        const posterTexture = new THREE.TextureLoader();
+                        const posterMaterial = new THREE.MeshLambertMaterial({
+                            map: posterTexture.load(movie.poster_url, undefined, undefined, () => {}),
+                            side: THREE.FrontSide
+                        });
+
+                        const poster = new THREE.Mesh(posterGeometry, posterMaterial);
+                        poster.position.set(wallShelves.left.xPos, levelY, zOffset);
+                        poster.rotation.y = -Math.PI / 2;
+                        poster.castShadow = true;
+                        poster.receiveShadow = true;
+                        poster.userData = { movie };
+                        scene.add(poster);
+                        posterObjects.push(poster);
+
+                        zOffset += zSpacing;
+                        movieIdx++;
+                    }
+                });
+
+                // Right wall shelves
+                shelfLevels.forEach((levelY) => {
+                    let zOffset = wallShelves.right.zRange.min;
+
+                    while (movieIdx < remainingMovies.length && zOffset < wallShelves.right.zRange.max - posterWidth) {
+                        const movie = remainingMovies[movieIdx];
+                        const posterGeometry = new THREE.PlaneGeometry(posterWidth, posterHeight);
+                        const posterTexture = new THREE.TextureLoader();
+                        const posterMaterial = new THREE.MeshLambertMaterial({
+                            map: posterTexture.load(movie.poster_url, undefined, undefined, () => {}),
+                            side: THREE.FrontSide
+                        });
+
+                        const poster = new THREE.Mesh(posterGeometry, posterMaterial);
+                        poster.position.set(wallShelves.right.xPos, levelY, zOffset);
+                        poster.rotation.y = Math.PI / 2;
+                        poster.castShadow = true;
+                        poster.receiveShadow = true;
+                        poster.userData = { movie };
+                        scene.add(poster);
+                        posterObjects.push(poster);
+
+                        zOffset += zSpacing;
+                        movieIdx++;
+                    }
                 });
             } catch (error) {
                 console.error('Failed to load movies:', error);
