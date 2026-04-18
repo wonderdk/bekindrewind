@@ -616,175 +616,88 @@
             return values;
         }
 
-        async function loadMovies() {
-            try {
-                const url = `https://raw.githubusercontent.com/wonderdk/bekindrewind/main/movies.csv?t=${Date.now()}`;
-                const response = await fetch(url);
-                const csv = await response.text();
-                const lines = csv.trim().split('\n');
-                const headers = parseCSVLine(lines[0]);
+        function loadMovies() {
+            let caseCount = 0;
+            const caseGeometry = new THREE.BoxGeometry(0.05, 0.75, 0.5);
+            const caseWidth = 0.5;
+            const levelHeights = [0.5, 1.5, 2.5, 3.5];
 
-                for (let i = 1; i < lines.length; i++) {
-                    const line = lines[i].trim();
-                    if (!line) continue;
+            // Color palette - dark navy with variations
+            const baseColor = 0x003087;
+            const colorVariations = [
+                0x003087, 0x1a4d99, 0x0d2966, 0x2d5fb5,
+                0x1a3d73, 0x004499, 0x002d66, 0x1f5fa8
+            ];
 
-                    const values = parseCSVLine(line);
-                    const movie = {};
-                    headers.forEach((header, idx) => {
-                        movie[header] = values[idx] || '';
+            // Fill aisle shelves
+            genres.forEach((genre) => {
+                const aisle = aisleShelves[genre];
+                if (!aisle) return;
+
+                levelHeights.forEach((levelY) => {
+                    // Front side of aisle
+                    for (let z = aisle.zRange.min; z < aisle.zRange.max - caseWidth; z += caseWidth) {
+                        const colorIdx = caseCount % colorVariations.length;
+                        const caseMaterial = new THREE.MeshLambertMaterial({
+                            color: colorVariations[colorIdx]
+                        });
+                        const dvdCase = new THREE.Mesh(caseGeometry, caseMaterial);
+                        dvdCase.position.set(aisle.xPos + 0.3, levelY, z);
+                        dvdCase.castShadow = true;
+                        dvdCase.receiveShadow = true;
+                        scene.add(dvdCase);
+                        caseCount++;
+                    }
+
+                    // Back side of aisle
+                    for (let z = aisle.zRange.min; z < aisle.zRange.max - caseWidth; z += caseWidth) {
+                        const colorIdx = caseCount % colorVariations.length;
+                        const caseMaterial = new THREE.MeshLambertMaterial({
+                            color: colorVariations[colorIdx]
+                        });
+                        const dvdCase = new THREE.Mesh(caseGeometry, caseMaterial);
+                        dvdCase.position.set(aisle.xPos - 0.3, levelY, z);
+                        dvdCase.castShadow = true;
+                        dvdCase.receiveShadow = true;
+                        scene.add(dvdCase);
+                        caseCount++;
+                    }
+                });
+            });
+
+            // Fill left wall shelves
+            levelHeights.forEach((levelY) => {
+                for (let z = wallShelves.left.zRange.min; z < wallShelves.left.zRange.max - caseWidth; z += caseWidth) {
+                    const colorIdx = caseCount % colorVariations.length;
+                    const caseMaterial = new THREE.MeshLambertMaterial({
+                        color: colorVariations[colorIdx]
                     });
-
-                    if (movie.hidden === 'true' || !movie.poster_url) continue;
-
-                    movies.push(movie);
+                    const dvdCase = new THREE.Mesh(caseGeometry, caseMaterial);
+                    dvdCase.position.set(wallShelves.left.xPos, levelY, z);
+                    dvdCase.castShadow = true;
+                    dvdCase.receiveShadow = true;
+                    scene.add(dvdCase);
+                    caseCount++;
                 }
+            });
 
-                console.log(`Loaded ${movies.length} films from CSV`);
-
-                // Group by first genre
-                const genreMap = {};
-                genres.forEach(g => genreMap[g] = []);
-
-                movies.forEach(movie => {
-                    const firstGenre = movie.genres ? movie.genres.split('|')[0].trim() : '';
-                    if (firstGenre && genreMap[firstGenre]) {
-                        genreMap[firstGenre].push(movie);
-                    }
-                });
-
-                let posterCount = 0;
-                const posterWidth = 0.5;
-                const posterHeight = 0.75;
-                const zSpacing = posterWidth;
-
-                // Create poster planes for aisle shelves
-                genres.forEach((genre) => {
-                    const aisle = aisleShelves[genre];
-                    if (!aisle) return;
-
-                    const moviesInGenre = genreMap[genre];
-                    const levelHeights = [0.5, 1.5, 2.5, 3.5];
-
-                    let movieIdx = 0;
-                    levelHeights.forEach((levelY) => {
-                        // Front side posters (facing -z direction, positive x offset)
-                        const frontMovies = moviesInGenre.slice(movieIdx, movieIdx + 30);
-                        let zOffset = aisle.zRange.min;
-
-                        frontMovies.forEach((movie) => {
-                            if (zOffset > aisle.zRange.max - posterWidth) return;
-
-                            const posterGeometry = new THREE.PlaneGeometry(posterWidth, posterHeight);
-                            const posterMaterial = new THREE.MeshBasicMaterial({
-                                map: textureLoader.load(movie.poster_url),
-                                side: THREE.FrontSide
-                            });
-
-                            const poster = new THREE.Mesh(posterGeometry, posterMaterial);
-                            poster.position.set(aisle.xPos + 0.3, levelY, zOffset);
-                            poster.rotation.y = 0;
-                            poster.castShadow = true;
-                            poster.receiveShadow = true;
-                            poster.userData = { movie };
-                            scene.add(poster);
-                            posterObjects.push(poster);
-                            posterCount++;
-
-                            zOffset += zSpacing;
-                        });
-
-                        movieIdx += frontMovies.length;
-
-                        // Back side posters (facing +z direction, negative x offset)
-                        zOffset = aisle.zRange.min;
-                        const backMovies = moviesInGenre.slice(movieIdx, movieIdx + 30);
-
-                        backMovies.forEach((movie) => {
-                            if (zOffset > aisle.zRange.max - posterWidth) return;
-
-                            const posterGeometry = new THREE.PlaneGeometry(posterWidth, posterHeight);
-                            const posterMaterial = new THREE.MeshBasicMaterial({
-                                map: textureLoader.load(movie.poster_url),
-                                side: THREE.FrontSide
-                            });
-
-                            const poster = new THREE.Mesh(posterGeometry, posterMaterial);
-                            poster.position.set(aisle.xPos - 0.3, levelY, zOffset);
-                            poster.rotation.y = Math.PI;
-                            poster.castShadow = true;
-                            poster.receiveShadow = true;
-                            poster.userData = { movie };
-                            scene.add(poster);
-                            posterObjects.push(poster);
-                            posterCount++;
-
-                            zOffset += zSpacing;
-                        });
-
-                        movieIdx += backMovies.length;
+            // Fill right wall shelves
+            levelHeights.forEach((levelY) => {
+                for (let z = wallShelves.right.zRange.min; z < wallShelves.right.zRange.max - caseWidth; z += caseWidth) {
+                    const colorIdx = caseCount % colorVariations.length;
+                    const caseMaterial = new THREE.MeshLambertMaterial({
+                        color: colorVariations[colorIdx]
                     });
-                });
+                    const dvdCase = new THREE.Mesh(caseGeometry, caseMaterial);
+                    dvdCase.position.set(wallShelves.right.xPos, levelY, z);
+                    dvdCase.castShadow = true;
+                    dvdCase.receiveShadow = true;
+                    scene.add(dvdCase);
+                    caseCount++;
+                }
+            });
 
-                // Distribute remaining movies across wall shelves
-                let remainingMovies = movies.slice(genres.length * 120);
-                let movieIdx = 0;
-                shelfLevels.forEach((levelY) => {
-                    let zOffset = wallShelves.left.zRange.min;
-
-                    while (movieIdx < remainingMovies.length && zOffset < wallShelves.left.zRange.max - posterWidth) {
-                        const movie = remainingMovies[movieIdx];
-                        const posterGeometry = new THREE.PlaneGeometry(posterWidth, posterHeight);
-                        const posterMaterial = new THREE.MeshBasicMaterial({
-                            map: textureLoader.load(movie.poster_url),
-                            side: THREE.FrontSide
-                        });
-
-                        const poster = new THREE.Mesh(posterGeometry, posterMaterial);
-                        poster.position.set(wallShelves.left.xPos, levelY, zOffset);
-                        poster.rotation.y = -Math.PI / 2;
-                        poster.castShadow = true;
-                        poster.receiveShadow = true;
-                        poster.userData = { movie };
-                        scene.add(poster);
-                        posterObjects.push(poster);
-                        posterCount++;
-
-                        zOffset += zSpacing;
-                        movieIdx++;
-                    }
-                });
-
-                // Right wall shelves
-                shelfLevels.forEach((levelY) => {
-                    let zOffset = wallShelves.right.zRange.min;
-
-                    while (movieIdx < remainingMovies.length && zOffset < wallShelves.right.zRange.max - posterWidth) {
-                        const movie = remainingMovies[movieIdx];
-                        const posterGeometry = new THREE.PlaneGeometry(posterWidth, posterHeight);
-                        const posterMaterial = new THREE.MeshBasicMaterial({
-                            map: textureLoader.load(movie.poster_url),
-                            side: THREE.FrontSide
-                        });
-
-                        const poster = new THREE.Mesh(posterGeometry, posterMaterial);
-                        poster.position.set(wallShelves.right.xPos, levelY, zOffset);
-                        poster.rotation.y = Math.PI / 2;
-                        poster.castShadow = true;
-                        poster.receiveShadow = true;
-                        poster.userData = { movie };
-                        scene.add(poster);
-                        posterObjects.push(poster);
-                        posterCount++;
-
-                        zOffset += zSpacing;
-                        movieIdx++;
-                    }
-                });
-
-                console.log(`Placed ${posterCount} posters on shelves`);
-            } catch (error) {
-                console.error('Failed to load movies:', error);
-            }
+            console.log(`Placed ${caseCount} DVD cases on all shelves`);
         }
 
         loadMovies();
@@ -942,10 +855,7 @@
         }
 
         canvas.addEventListener('click', () => {
-            // Check if hovering over a poster
-            if (hoveredPoster && hoveredPoster.userData.movie) {
-                showDetailOverlay(hoveredPoster.userData.movie);
-            } else if (!isMobileDevice) {
+            if (!isMobileDevice) {
                 canvas.requestPointerLock?.() ||
                 canvas.mozRequestPointerLock?.() ||
                 canvas.webkitRequestPointerLock?.();
@@ -1077,22 +987,6 @@
             camera.rotation.y = yaw;
             camera.rotation.x = pitch;
 
-            // Raycasting for poster hover
-            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-            const intersects = raycaster.intersectObjects(posterObjects);
-
-            if (intersects.length > 0) {
-                const poster = intersects[0].object;
-                if (hoveredPoster !== poster) {
-                    hoveredPoster = poster;
-                    showMovieTitle(poster.userData.movie);
-                }
-            } else {
-                if (hoveredPoster) {
-                    hoveredPoster = null;
-                    hideMovieTitle();
-                }
-            }
 
             renderer.render(scene, camera);
         }
