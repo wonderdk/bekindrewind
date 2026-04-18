@@ -98,7 +98,7 @@
 <body>
     <a id="backButton" href="index.html">← Back to Collection</a>
     <div id="crosshair"></div>
-    <div id="infoText">WASD to move • Mouse to look • Click to lock • ESC to unlock</div>
+    <div id="infoText">Click to look around | WASD to move | ESC to release mouse</div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
@@ -116,7 +116,7 @@
 
         // Camera setup
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 2, -25);
+        camera.position.set(0, 1.7, 18);
 
         // Store dimensions
         const STORE_WIDTH = 60;
@@ -465,9 +465,9 @@
             // Camera bob while walking
             if (isWalking) {
                 bobTime += deltaTime * 5;
-                camera.position.y = 2 + Math.sin(bobTime) * 0.1;
+                camera.position.y = 1.7 + Math.sin(bobTime) * 0.1;
             } else {
-                camera.position.y = 2;
+                camera.position.y = 1.7;
                 bobTime = 0;
             }
 
