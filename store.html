@@ -189,9 +189,9 @@
         renderer.shadowMap.type = THREE.PCFShadowShadowMap;
         document.body.appendChild(canvas);
 
-        // Camera setup
+        // Camera setup - start at entrance facing down aisles
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.7, 18);
+        camera.position.set(0, 1.7, -15);
 
         // Store dimensions
         const STORE_WIDTH = 60;
@@ -232,19 +232,22 @@
 
         // Floor with geometric carpet pattern
         const floorGeometry = new THREE.PlaneGeometry(STORE_WIDTH, STORE_DEPTH);
-        const floorMaterial = new THREE.MeshLambertMaterial({ color: DARK_FLOOR });
+        const darkCharcoal = 0x1a1a1a;
+        const darkerCharcoal = 0x111111;
+        const floorMaterial = new THREE.MeshLambertMaterial({ color: darkCharcoal });
         const floor = new THREE.Mesh(floorGeometry, floorMaterial);
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // Carpet pattern (geometric tiles)
+        // Carpet pattern (subtle darker geometric pattern)
         const carpetPattern = new THREE.Group();
-        const tileSize = 5;
+        const tileSize = 3;
         for (let x = -STORE_WIDTH / 2; x < STORE_WIDTH / 2; x += tileSize) {
             for (let z = -STORE_DEPTH / 2; z < STORE_DEPTH / 2; z += tileSize) {
-                const tileGeometry = new THREE.PlaneGeometry(tileSize - 0.1, tileSize - 0.1);
-                const color = ((Math.floor(x / tileSize) + Math.floor(z / tileSize)) % 2 === 0) ? TEAL : PURPLE;
+                const tileGeometry = new THREE.PlaneGeometry(tileSize - 0.05, tileSize - 0.05);
+                const isPattern = ((Math.floor(x / tileSize) + Math.floor(z / tileSize)) % 3 === 0);
+                const color = isPattern ? darkerCharcoal : darkCharcoal;
                 const tileMaterial = new THREE.MeshLambertMaterial({ color });
                 const tile = new THREE.Mesh(tileGeometry, tileMaterial);
                 tile.position.set(x + tileSize / 2, 0.01, z + tileSize / 2);
@@ -278,55 +281,117 @@
         }
         scene.add(ceilingTiles);
 
-        // Walls
-        const wallMaterial = new THREE.MeshLambertMaterial({ color: BLOCKBUSTER_BLUE });
+        // Walls - Blockbuster style (yellow upper, navy lower with stripe)
+        // Back wall upper (yellow)
+        const backWallUpperGeometry = new THREE.PlaneGeometry(STORE_WIDTH, STORE_HEIGHT / 2);
+        const backWallUpperMaterial = new THREE.MeshLambertMaterial({ color: BLOCKBUSTER_YELLOW });
+        const backWallUpper = new THREE.Mesh(backWallUpperGeometry, backWallUpperMaterial);
+        backWallUpper.position.set(0, STORE_HEIGHT * 0.75, STORE_DEPTH / 2);
+        backWallUpper.castShadow = true;
+        backWallUpper.receiveShadow = true;
+        scene.add(backWallUpper);
 
-        // Back wall
-        const backWallGeometry = new THREE.PlaneGeometry(STORE_WIDTH, STORE_HEIGHT);
-        const backWall = new THREE.Mesh(backWallGeometry, wallMaterial);
-        backWall.position.z = STORE_DEPTH / 2;
-        backWall.position.y = STORE_HEIGHT / 2;
-        backWall.castShadow = true;
-        backWall.receiveShadow = true;
-        scene.add(backWall);
+        // Back wall lower (navy)
+        const backWallLowerGeometry = new THREE.PlaneGeometry(STORE_WIDTH, STORE_HEIGHT / 2 - 0.4);
+        const backWallLowerMaterial = new THREE.MeshLambertMaterial({ color: BLOCKBUSTER_BLUE });
+        const backWallLower = new THREE.Mesh(backWallLowerGeometry, backWallLowerMaterial);
+        backWallLower.position.set(0, STORE_HEIGHT * 0.25, STORE_DEPTH / 2);
+        backWallLower.castShadow = true;
+        backWallLower.receiveShadow = true;
+        scene.add(backWallLower);
 
-        // Front wall (with opening for entrance)
-        const frontWallLeft = new THREE.Mesh(
-            new THREE.PlaneGeometry(STORE_WIDTH / 2 - 5, STORE_HEIGHT),
-            wallMaterial
+        // Back wall dividing stripe
+        const backStripeGeometry = new THREE.PlaneGeometry(STORE_WIDTH, 0.4);
+        const stripeMaterial = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
+        const backStripe = new THREE.Mesh(backStripeGeometry, stripeMaterial);
+        backStripe.position.set(0, STORE_HEIGHT / 2, STORE_DEPTH / 2 + 0.01);
+        scene.add(backStripe);
+
+        // Front wall upper (yellow) - with opening for entrance
+        const frontWallLeftUpper = new THREE.Mesh(
+            new THREE.PlaneGeometry(STORE_WIDTH / 2 - 5, STORE_HEIGHT / 2),
+            backWallUpperMaterial
         );
-        frontWallLeft.position.set(-STORE_WIDTH / 4 - 2.5, STORE_HEIGHT / 2, -STORE_DEPTH / 2);
-        frontWallLeft.castShadow = true;
-        frontWallLeft.receiveShadow = true;
-        scene.add(frontWallLeft);
+        frontWallLeftUpper.position.set(-STORE_WIDTH / 4 - 2.5, STORE_HEIGHT * 0.75, -STORE_DEPTH / 2);
+        frontWallLeftUpper.castShadow = true;
+        frontWallLeftUpper.receiveShadow = true;
+        scene.add(frontWallLeftUpper);
 
-        const frontWallRight = new THREE.Mesh(
-            new THREE.PlaneGeometry(STORE_WIDTH / 2 - 5, STORE_HEIGHT),
-            wallMaterial
+        const frontWallRightUpper = new THREE.Mesh(
+            new THREE.PlaneGeometry(STORE_WIDTH / 2 - 5, STORE_HEIGHT / 2),
+            backWallUpperMaterial
         );
-        frontWallRight.position.set(STORE_WIDTH / 4 + 2.5, STORE_HEIGHT / 2, -STORE_DEPTH / 2);
-        frontWallRight.castShadow = true;
-        frontWallRight.receiveShadow = true;
-        scene.add(frontWallRight);
+        frontWallRightUpper.position.set(STORE_WIDTH / 4 + 2.5, STORE_HEIGHT * 0.75, -STORE_DEPTH / 2);
+        frontWallRightUpper.castShadow = true;
+        frontWallRightUpper.receiveShadow = true;
+        scene.add(frontWallRightUpper);
 
-        // Side walls
-        const sideWallMaterial = new THREE.MeshLambertMaterial({ color: 0x002244 });
-        const leftWallGeometry = new THREE.PlaneGeometry(STORE_DEPTH, STORE_HEIGHT);
-        const leftWall = new THREE.Mesh(leftWallGeometry, sideWallMaterial);
-        leftWall.position.x = -STORE_WIDTH / 2;
-        leftWall.position.y = STORE_HEIGHT / 2;
-        leftWall.rotation.y = Math.PI / 2;
-        leftWall.castShadow = true;
-        leftWall.receiveShadow = true;
-        scene.add(leftWall);
+        // Front wall lower (navy)
+        const frontWallLeftLower = new THREE.Mesh(
+            new THREE.PlaneGeometry(STORE_WIDTH / 2 - 5, STORE_HEIGHT / 2 - 0.4),
+            backWallLowerMaterial
+        );
+        frontWallLeftLower.position.set(-STORE_WIDTH / 4 - 2.5, STORE_HEIGHT * 0.25, -STORE_DEPTH / 2);
+        frontWallLeftLower.castShadow = true;
+        frontWallLeftLower.receiveShadow = true;
+        scene.add(frontWallLeftLower);
 
-        const rightWall = new THREE.Mesh(leftWallGeometry, sideWallMaterial);
-        rightWall.position.x = STORE_WIDTH / 2;
-        rightWall.position.y = STORE_HEIGHT / 2;
-        rightWall.rotation.y = -Math.PI / 2;
-        rightWall.castShadow = true;
-        rightWall.receiveShadow = true;
-        scene.add(rightWall);
+        const frontWallRightLower = new THREE.Mesh(
+            new THREE.PlaneGeometry(STORE_WIDTH / 2 - 5, STORE_HEIGHT / 2 - 0.4),
+            backWallLowerMaterial
+        );
+        frontWallRightLower.position.set(STORE_WIDTH / 4 + 2.5, STORE_HEIGHT * 0.25, -STORE_DEPTH / 2);
+        frontWallRightLower.castShadow = true;
+        frontWallRightLower.receiveShadow = true;
+        scene.add(frontWallRightLower);
+
+        // Side walls - upper (yellow)
+        const sideWallUpperGeometry = new THREE.PlaneGeometry(STORE_DEPTH, STORE_HEIGHT / 2);
+        const sideWallUpperMaterial = new THREE.MeshLambertMaterial({ color: BLOCKBUSTER_YELLOW });
+
+        const leftWallUpper = new THREE.Mesh(sideWallUpperGeometry, sideWallUpperMaterial);
+        leftWallUpper.position.set(-STORE_WIDTH / 2, STORE_HEIGHT * 0.75, 0);
+        leftWallUpper.rotation.y = Math.PI / 2;
+        leftWallUpper.castShadow = true;
+        leftWallUpper.receiveShadow = true;
+        scene.add(leftWallUpper);
+
+        const rightWallUpper = new THREE.Mesh(sideWallUpperGeometry, sideWallUpperMaterial);
+        rightWallUpper.position.set(STORE_WIDTH / 2, STORE_HEIGHT * 0.75, 0);
+        rightWallUpper.rotation.y = -Math.PI / 2;
+        rightWallUpper.castShadow = true;
+        rightWallUpper.receiveShadow = true;
+        scene.add(rightWallUpper);
+
+        // Side walls - lower (navy)
+        const sideWallLowerGeometry = new THREE.PlaneGeometry(STORE_DEPTH, STORE_HEIGHT / 2 - 0.4);
+        const sideWallLowerMaterial = new THREE.MeshLambertMaterial({ color: BLOCKBUSTER_BLUE });
+
+        const leftWallLower = new THREE.Mesh(sideWallLowerGeometry, sideWallLowerMaterial);
+        leftWallLower.position.set(-STORE_WIDTH / 2, STORE_HEIGHT * 0.25, 0);
+        leftWallLower.rotation.y = Math.PI / 2;
+        leftWallLower.castShadow = true;
+        leftWallLower.receiveShadow = true;
+        scene.add(leftWallLower);
+
+        const rightWallLower = new THREE.Mesh(sideWallLowerGeometry, sideWallLowerMaterial);
+        rightWallLower.position.set(STORE_WIDTH / 2, STORE_HEIGHT * 0.25, 0);
+        rightWallLower.rotation.y = -Math.PI / 2;
+        rightWallLower.castShadow = true;
+        rightWallLower.receiveShadow = true;
+        scene.add(rightWallLower);
+
+        // Side wall dividing stripes
+        const sideStripeGeometry = new THREE.PlaneGeometry(STORE_DEPTH, 0.4);
+        const leftStripe = new THREE.Mesh(sideStripeGeometry, stripeMaterial);
+        leftStripe.position.set(-STORE_WIDTH / 2 + 0.01, STORE_HEIGHT / 2, 0);
+        leftStripe.rotation.y = Math.PI / 2;
+        scene.add(leftStripe);
+
+        const rightStripe = new THREE.Mesh(sideStripeGeometry, stripeMaterial);
+        rightStripe.position.set(STORE_WIDTH / 2 - 0.01, STORE_HEIGHT / 2, 0);
+        rightStripe.rotation.y = -Math.PI / 2;
+        scene.add(rightStripe);
 
         // Front counter
         const counterGeometry = new THREE.BoxGeometry(15, 1.2, 2);
@@ -346,69 +411,70 @@
         tv.receiveShadow = true;
         scene.add(tv);
 
-        // Shelves and aisles
+        // Shelves and aisles - double-sided tall units per genre
         const genres = ['Horror', 'Romance', 'Action', 'Drama', 'Thriller', 'Sci-Fi'];
-        const shelfSpacing = STORE_WIDTH / (genres.length + 1);
         const shelfColliders = [];
+        const aisleCenters = [-20, -12, -4, 4, 12, 20];
+        const aisleShelves = {};
 
         genres.forEach((genre, index) => {
-            const xPos = -STORE_WIDTH / 2 + shelfSpacing * (index + 1);
+            const xPos = aisleCenters[index];
+            const aisleFrontZ = 18;
+            const aisleFrontZZ = -18;
 
-            // Create shelf unit (simple box structure)
+            // Create double-sided shelf unit running front-to-back
             const shelfGroup = new THREE.Group();
             shelfGroup.position.set(xPos, 0, 0);
 
-            // Vertical supports
-            const supportGeometry = new THREE.BoxGeometry(0.3, CEILING_HEIGHT - 2, 0.3);
+            // Vertical supports (4 posts along the aisle)
+            const supportGeometry = new THREE.BoxGeometry(0.3, 2, 0.3);
             const supportMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
+            const supportZPositions = [-12, -4, 4, 12];
 
-            const leftSupport = new THREE.Mesh(supportGeometry, supportMaterial);
-            leftSupport.position.set(-1.5, (CEILING_HEIGHT - 2) / 2, 0);
-            leftSupport.castShadow = true;
-            leftSupport.receiveShadow = true;
-            shelfGroup.add(leftSupport);
+            supportZPositions.forEach(z => {
+                const support = new THREE.Mesh(supportGeometry, supportMaterial);
+                support.position.set(0, 1, z);
+                support.castShadow = true;
+                support.receiveShadow = true;
+                shelfGroup.add(support);
+            });
 
-            const rightSupport = new THREE.Mesh(supportGeometry, supportMaterial);
-            rightSupport.position.set(1.5, (CEILING_HEIGHT - 2) / 2, 0);
-            rightSupport.castShadow = true;
-            rightSupport.receiveShadow = true;
-            shelfGroup.add(rightSupport);
-
-            // Shelves (4 levels)
+            // Shelves (4 levels) - thin shelf extending front to back
             const shelfMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
-            for (let level = 0; level < 4; level++) {
-                const shelfGeometry = new THREE.BoxGeometry(3.5, 0.3, 2);
+            const shelfLevels = [0.5, 1.5, 2.5, 3.5];
+
+            shelfLevels.forEach(level => {
+                const shelfGeometry = new THREE.BoxGeometry(0.2, 0.2, 36);
                 const shelf = new THREE.Mesh(shelfGeometry, shelfMaterial);
-                shelf.position.y = 1 + level * 2;
+                shelf.position.y = level;
                 shelf.castShadow = true;
                 shelf.receiveShadow = true;
                 shelfGroup.add(shelf);
-            }
-
-            // Back panel
-            const backPanelGeometry = new THREE.BoxGeometry(3.5, CEILING_HEIGHT - 2, 0.2);
-            const backPanelMaterial = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
-            const backPanel = new THREE.Mesh(backPanelGeometry, backPanelMaterial);
-            backPanel.position.set(0, (CEILING_HEIGHT - 2) / 2, -1.2);
-            backPanel.castShadow = true;
-            backPanel.receiveShadow = true;
-            shelfGroup.add(backPanel);
+            });
 
             scene.add(shelfGroup);
 
-            // Collision box
+            // Store shelf reference for poster placement
+            aisleShelves[genre] = {
+                xPos: xPos,
+                zRange: { min: aisleFrontZZ, max: aisleFrontZ },
+                levels: shelfLevels
+            };
+
+            // Collision box for the aisle
             shelfColliders.push({
                 position: new THREE.Vector3(xPos, 0, 0),
-                width: 3.5,
-                height: CEILING_HEIGHT - 2,
-                depth: 2
+                width: 1.5,
+                height: 2,
+                depth: 36
             });
 
-            // Genre sign above shelf
+            // Genre sign hanging above aisle at ceiling
             const canvas2D = document.createElement('canvas');
             canvas2D.width = 256;
             canvas2D.height = 128;
             const ctx = canvas2D.getContext('2d');
+            ctx.fillStyle = BLOCKBUSTER_BLUE.toString(16).padStart(6, '0');
             ctx.fillStyle = '#003087';
             ctx.fillRect(0, 0, 256, 128);
             ctx.fillStyle = '#FFD600';
@@ -418,13 +484,21 @@
             ctx.fillText(genre, 128, 64);
 
             const texture = new THREE.CanvasTexture(canvas2D);
-            const signGeometry = new THREE.PlaneGeometry(4, 1.5);
+            const signGeometry = new THREE.PlaneGeometry(5, 1.5);
             const signMaterial = new THREE.MeshLambertMaterial({ map: texture });
             const sign = new THREE.Mesh(signGeometry, signMaterial);
-            sign.position.set(xPos, CEILING_HEIGHT - 1.5, 1.5);
+            sign.position.set(xPos, CEILING_HEIGHT - 1, 0);
             sign.castShadow = true;
             sign.receiveShadow = true;
             scene.add(sign);
+
+            // Fluorescent strip light along ceiling above this aisle
+            const stripLight = new THREE.PointLight(0xffffff, 1.2, 100);
+            stripLight.position.set(xPos, CEILING_HEIGHT - 0.3, 0);
+            stripLight.castShadow = true;
+            stripLight.shadow.mapSize.width = 256;
+            stripLight.shadow.mapSize.height = 256;
+            scene.add(stripLight);
         });
 
         // Movie posters data and setup
@@ -468,32 +542,75 @@
                     }
                 });
 
-                // Create poster planes for each genre
-                genres.forEach((genre, genreIndex) => {
-                    const xPos = -STORE_WIDTH / 2 + shelfSpacing * (genreIndex + 1);
+                // Create poster planes for each aisle
+                genres.forEach((genre) => {
+                    const aisle = aisleShelves[genre];
+                    if (!aisle) return;
+
                     const moviesInGenre = genreMap[genre];
+                    const posterWidth = 0.35;
+                    const posterHeight = 0.52;
+                    const zSpacing = posterWidth;
+                    const levelHeights = [0.5, 1.5, 2.5, 3.5];
 
-                    moviesInGenre.forEach((movie, movieIndex) => {
-                        // Determine shelf level (0-3, 4 levels)
-                        const level = movieIndex % 4;
-                        const shelfY = 1 + level * 2;
-                        const posterIndex = Math.floor(movieIndex / 4);
-                        const maxPostersPerShelf = 3;
-                        const posterX = posterIndex - (maxPostersPerShelf - 1) / 2;
+                    // Distribute movies across shelves
+                    let movieIdx = 0;
+                    levelHeights.forEach((levelY) => {
+                        // Front side posters (facing -z direction, positive x offset)
+                        const frontMovies = moviesInGenre.slice(movieIdx, movieIdx + 30);
+                        let zOffset = aisle.zRange.min;
 
-                        const posterGeometry = new THREE.PlaneGeometry(0.35, 0.5);
-                        const posterTexture = new THREE.TextureLoader();
-                        const posterMaterial = new THREE.MeshLambertMaterial({
-                            map: posterTexture.load(movie.poster_url, undefined, undefined, () => {})
+                        frontMovies.forEach((movie) => {
+                            if (zOffset > aisle.zRange.max - posterWidth) return;
+
+                            const posterGeometry = new THREE.PlaneGeometry(posterWidth, posterHeight);
+                            const posterTexture = new THREE.TextureLoader();
+                            const posterMaterial = new THREE.MeshLambertMaterial({
+                                map: posterTexture.load(movie.poster_url, undefined, undefined, () => {}),
+                                side: THREE.FrontSide
+                            });
+
+                            const poster = new THREE.Mesh(posterGeometry, posterMaterial);
+                            poster.position.set(aisle.xPos + 0.3, levelY, zOffset);
+                            poster.rotation.y = 0;
+                            poster.castShadow = true;
+                            poster.receiveShadow = true;
+                            poster.userData = { movie };
+                            scene.add(poster);
+                            posterObjects.push(poster);
+
+                            zOffset += zSpacing;
                         });
 
-                        const poster = new THREE.Mesh(posterGeometry, posterMaterial);
-                        poster.position.set(xPos + posterX * 0.5, shelfY, 0.95);
-                        poster.castShadow = true;
-                        poster.receiveShadow = true;
-                        poster.userData = { movie };
-                        scene.add(poster);
-                        posterObjects.push(poster);
+                        movieIdx += frontMovies.length;
+
+                        // Back side posters (facing +z direction, negative x offset)
+                        zOffset = aisle.zRange.min;
+                        const backMovies = moviesInGenre.slice(movieIdx, movieIdx + 30);
+
+                        backMovies.forEach((movie) => {
+                            if (zOffset > aisle.zRange.max - posterWidth) return;
+
+                            const posterGeometry = new THREE.PlaneGeometry(posterWidth, posterHeight);
+                            const posterTexture = new THREE.TextureLoader();
+                            const posterMaterial = new THREE.MeshLambertMaterial({
+                                map: posterTexture.load(movie.poster_url, undefined, undefined, () => {}),
+                                side: THREE.FrontSide
+                            });
+
+                            const poster = new THREE.Mesh(posterGeometry, posterMaterial);
+                            poster.position.set(aisle.xPos - 0.3, levelY, zOffset);
+                            poster.rotation.y = Math.PI;
+                            poster.castShadow = true;
+                            poster.receiveShadow = true;
+                            poster.userData = { movie };
+                            scene.add(poster);
+                            posterObjects.push(poster);
+
+                            zOffset += zSpacing;
+                        });
+
+                        movieIdx += backMovies.length;
                     });
                 });
             } catch (error) {
