@@ -206,7 +206,7 @@
     scene.add(leftWallLower);
 
     const leftWallUpperGeometry = new THREE.PlaneGeometry(40, 1.8);
-    const wallUpperMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD600, roughness: 0.6 });
+    const wallUpperMaterial = new THREE.MeshBasicMaterial({ color: 0xFFD600 });
     const leftWallUpper = new THREE.Mesh(leftWallUpperGeometry, wallUpperMaterial);
     leftWallUpper.position.set(-29.99, 3.6, 0);
     leftWallUpper.rotation.y = Math.PI / 2;
@@ -258,7 +258,7 @@
     const registerGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.3);
     const registerMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 });
     const register = new THREE.Mesh(registerGeometry, registerMaterial);
-    register.position.set(-22, 1.35, -17);
+    register.position.set(-22, 1.1, -17);
     scene.add(register);
 
     const checkoutSignCanvas = document.createElement('canvas');
@@ -280,19 +280,22 @@
     checkoutSign.rotation.x = Math.PI / 12;
     scene.add(checkoutSign);
 
-    const doorGeometry = new THREE.BoxGeometry(2, 3, 0.1);
-    const doorMaterial = new THREE.MeshBasicMaterial({ color: 0x444444 });
+    const doorGeometry = new THREE.BoxGeometry(2, 2.8, 0.1);
+    const doorMaterial = new THREE.MeshBasicMaterial({ color: 0x505070 });
     const leftDoor = new THREE.Mesh(doorGeometry, doorMaterial);
-    leftDoor.position.set(-0.5, 1.5, -20);
+    leftDoor.position.set(-1.15, 1.4, -20);
+    leftDoor.userData = { clickable: true, href: 'index.html' };
     scene.add(leftDoor);
     const rightDoor = new THREE.Mesh(doorGeometry, doorMaterial);
-    rightDoor.position.set(0.5, 1.5, -20);
+    rightDoor.position.set(1.15, 1.4, -20);
+    rightDoor.userData = { clickable: true, href: 'index.html' };
     scene.add(rightDoor);
 
-    const doorsGroup = new THREE.Group();
-    doorsGroup.add(leftDoor);
-    doorsGroup.add(rightDoor);
-    doorsGroup.userData = { clickable: true, href: 'index.html' };
+    const frameGeometry = new THREE.BoxGeometry(4.5, 3, 0.05);
+    const frameMaterial = new THREE.MeshBasicMaterial({ color: 0x1a1a2a });
+    const doorFrame = new THREE.Mesh(frameGeometry, frameMaterial);
+    doorFrame.position.set(0, 1.4, -20.05);
+    scene.add(doorFrame);
 
     const exitSignCanvas = document.createElement('canvas');
     exitSignCanvas.width = 256;
@@ -312,15 +315,17 @@
     exitSign.position.set(0, 3.5, -19.9);
     scene.add(exitSign);
 
-    const snackColors = [0xFF0000, 0xFFFF00, 0xFFA500, 0x00FF00, 0x800080];
+    const snackColors = [0x8B1A1A, 0x1A1A8B, 0x1A5C1A, 0x8B4500, 0x4A1A6B, 0x8B7300];
     for (let row = 0; row < 4; row++) {
       let x = 5;
       while (x < 28) {
         const colorIdx = Math.floor(Math.random() * snackColors.length);
-        const snackGeometry = new THREE.BoxGeometry(0.2, 0.25, 0.1);
+        const snackGeometry = new THREE.BoxGeometry(0.18, 0.22, 0.12);
         const snackMaterial = new THREE.MeshBasicMaterial({ color: snackColors[colorIdx] });
         const snack = new THREE.Mesh(snackGeometry, snackMaterial);
         snack.position.set(x, 0.3 + row * 0.3, -19.8);
+        const randomRotation = (Math.random() - 0.5) * (Math.PI / 36);
+        snack.rotation.z = randomRotation;
         scene.add(snack);
         x += 0.22;
       }
@@ -364,7 +369,7 @@
 
       shelfLevels.forEach((levelY, levelIdx) => {
         for (let shelfSide = 0; shelfSide < 2; shelfSide++) {
-          const shelfX = aisleCenterX + (shelfSide === 0 ? -0.45 : 0.45);
+          const shelfX = aisleCenterX + (shelfSide === 0 ? -0.6 : 0.6);
           const shelfZ = 0;
 
           const isInCheckout = aisleCenterX >= checkoutMinX && aisleCenterX <= checkoutMaxX;
@@ -406,7 +411,7 @@
               const variedMaterial = new THREE.MeshBasicMaterial({ color: variedColor });
               const dvdCase = new THREE.Mesh(caseGeometry, variedMaterial);
               dvdCase.position.set(shelfX, levelY + 0.2, zPos);
-              dvdCase.rotation.y = shelfSide === 0 ? 0 : Math.PI;
+              dvdCase.rotation.y = shelfSide === 0 ? Math.PI : 0;
               dvdCase.userData = { genre };
               dvdCases.push(dvdCase);
               scene.add(dvdCase);
@@ -431,13 +436,14 @@
       const signTexture = new THREE.CanvasTexture(signCanvas);
       const cubeGeometry = new THREE.BoxGeometry(1.2, 1.2, 1.2);
       const navyMaterial = new THREE.MeshBasicMaterial({ color: 0x003087 });
+      const textMaterial = new THREE.MeshBasicMaterial({ map: signTexture });
       const cubeMaterials = [
+        textMaterial,
+        textMaterial,
         navyMaterial,
         navyMaterial,
-        new THREE.MeshBasicMaterial({ map: signTexture }),
-        new THREE.MeshBasicMaterial({ map: signTexture }),
-        navyMaterial,
-        navyMaterial
+        textMaterial,
+        textMaterial
       ];
       const signCube = new THREE.Mesh(cubeGeometry, cubeMaterials);
       signCube.position.set(aisleCenterX, 3.2, 0);
@@ -493,23 +499,6 @@
     console.log(`Total DVD cases placed: ${totalDVDCases}`);
 
 
-    const postColor = 0x222222;
-    aislePositionsX.forEach(aisleCenterX => {
-      for (let z of [-10, 10]) {
-        const postGeometry = new THREE.BoxGeometry(0.08, 4.5, 0.08);
-        const postMaterial = new THREE.MeshBasicMaterial({ color: postColor });
-        const leftPost = new THREE.Mesh(postGeometry, postMaterial);
-        leftPost.position.set(aisleCenterX - 1.2, 2.25, z);
-        leftPost.castShadow = true;
-        scene.add(leftPost);
-
-        const rightPost = new THREE.Mesh(postGeometry, postMaterial);
-        rightPost.position.set(aisleCenterX + 1.2, 2.25, z);
-        rightPost.castShadow = true;
-        scene.add(rightPost);
-      }
-    });
-
     const keys = {};
     const playerVelocity = new THREE.Vector3();
     const walkSpeed = 0.04;
@@ -551,7 +540,7 @@
     document.addEventListener('click', (e) => {
       if (document.pointerLockElement !== renderer.domElement) {
         raycaster.setFromCamera(mouse, camera);
-        const doorIntersects = raycaster.intersectObjects([leftDoor, rightDoor]);
+        const doorIntersects = raycaster.intersectObjects([leftDoor, rightDoor], true);
         if (doorIntersects.length > 0) {
           window.location.href = 'index.html';
           return;
