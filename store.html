@@ -379,8 +379,8 @@
           scene.add(leftShelf);
           collisionBoxes.push({ x: leftShelfX, z: 0, w: 0.4, d: 32, y: levelY, h: 0.06 });
 
-          const maxCases = 40;
-          const caseSpacing = 0.45;
+          const maxCases = 80;
+          const caseSpacing = 0.42;
           const zStart = -13;
           const zEnd = 17;
           for (let i = 0; i < maxCases; i++) {
@@ -392,7 +392,7 @@
               x: centerX - 0.1,
               y: levelY + 0.21,
               z: zPos,
-              rotY: Math.PI,
+              rotY: -Math.PI / 2,
               genre: aisleBefore
             });
             totalDVDInstances++;
@@ -408,8 +408,8 @@
           scene.add(rightShelf);
           collisionBoxes.push({ x: rightShelfX, z: 0, w: 0.4, d: 32, y: levelY, h: 0.06 });
 
-          const maxCases = 40;
-          const caseSpacing = 0.45;
+          const maxCases = 80;
+          const caseSpacing = 0.42;
           const zStart = -13;
           const zEnd = 17;
           for (let i = 0; i < maxCases; i++) {
@@ -421,7 +421,7 @@
               x: centerX + 0.1,
               y: levelY + 0.21,
               z: zPos,
-              rotY: 0,
+              rotY: Math.PI / 2,
               genre: aisleAfter
             });
             totalDVDInstances++;
