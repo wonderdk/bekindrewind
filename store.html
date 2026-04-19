@@ -619,7 +619,7 @@
                 shelfY + 0.248,
                 z
               );
-              mesh.rotation.y = face.side === 'right' ? -Math.PI / 2 : Math.PI / 2;
+              mesh.rotation.y = face.side === 'right' ? Math.PI / 2 : -Math.PI / 2;
               mesh.userData.film = movie;
               mesh.userData.genre = face.genre;
               mesh.userData.faceIndex = 4;
