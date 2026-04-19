@@ -208,15 +208,15 @@
 
         for (const movie of movies) {
           if (!movie.genre_ids) continue;
-          const genreIds = movie.genre_ids.split('|').map(g => g.trim().replace(/^["']|["']$/g, ''));
+          const genres = movie.genre_ids.split('|').map(g => g.trim()).filter(Boolean);
+
           const targetGenres = new Set();
 
-          for (const genreId of genreIds) {
-            if (aisleGenres.has(genreId)) {
-              targetGenres.add(genreId);
-            }
-            if (secondaryMap[genreId] && aisleGenres.has(secondaryMap[genreId])) {
-              targetGenres.add(secondaryMap[genreId]);
+          for (const genre of genres) {
+            if (aisleGenres.has(genre)) {
+              targetGenres.add(genre);
+            } else if (secondaryMap[genre]) {
+              targetGenres.add(secondaryMap[genre]);
             }
           }
 
