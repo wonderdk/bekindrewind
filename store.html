@@ -155,37 +155,48 @@
     const collisionBoxes = [];
 
     const floorGeometry = new THREE.PlaneGeometry(60, 40);
-    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.8 });
+    const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x3a3a3a });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = 0;
     scene.add(floor);
 
+    const gridCanvas = document.createElement('canvas');
+    gridCanvas.width = 512;
+    gridCanvas.height = 512;
+    const gridCtx = gridCanvas.getContext('2d');
+    gridCtx.fillStyle = '#3a3a3a';
+    gridCtx.fillRect(0, 0, 512, 512);
+    gridCtx.strokeStyle = '#2a2a2a';
+    gridCtx.lineWidth = 1;
+    for (let i = 0; i <= 512; i += 64) {
+      gridCtx.beginPath();
+      gridCtx.moveTo(i, 0);
+      gridCtx.lineTo(i, 512);
+      gridCtx.stroke();
+      gridCtx.beginPath();
+      gridCtx.moveTo(0, i);
+      gridCtx.lineTo(512, i);
+      gridCtx.stroke();
+    }
+    const gridTexture = new THREE.CanvasTexture(gridCanvas);
+    gridTexture.repeat.set(8, 8);
+    gridTexture.wrapS = THREE.RepeatWrapping;
+    gridTexture.wrapT = THREE.RepeatWrapping;
     const tileGeometry = new THREE.PlaneGeometry(60, 40);
-    const tileMaterial = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 });
+    const tileMaterial = new THREE.MeshBasicMaterial({ map: gridTexture });
     const tiles = new THREE.Mesh(tileGeometry, tileMaterial);
     tiles.rotation.x = -Math.PI / 2;
     tiles.position.y = 0.01;
     scene.add(tiles);
 
     const ceilingGeometry = new THREE.PlaneGeometry(60, 40);
-    const ceilingMaterial = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.7 });
+    const ceilingMaterial = new THREE.MeshBasicMaterial({ color: 0xcccccc });
     const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
     ceiling.rotation.x = Math.PI / 2;
     ceiling.position.y = 4.5;
     scene.add(ceiling);
 
-    const ceilingGridGeometry = new THREE.PlaneGeometry(60, 40);
-    const ceilingGridMaterial = new THREE.MeshStandardMaterial({
-      color: 0xaaaaaa,
-      roughness: 0.9,
-      transparent: true,
-      opacity: 0.3
-    });
-    const ceilingGrid = new THREE.Mesh(ceilingGridGeometry, ceilingGridMaterial);
-    ceilingGrid.rotation.x = Math.PI / 2;
-    ceilingGrid.position.y = 4.45;
-    scene.add(ceilingGrid);
 
     const leftWallLowerGeometry = new THREE.PlaneGeometry(40, 2.7);
     const wallLowerMaterial = new THREE.MeshStandardMaterial({ color: 0x003087, roughness: 0.6 });
@@ -235,14 +246,14 @@
     backStripe.position.set(0, 2.7, -20);
     scene.add(backStripe);
 
-    const counterGeometry = new THREE.BoxGeometry(3, 1, 1.5);
+    const counterGeometry = new THREE.BoxGeometry(2, 0.9, 1);
     const counterMaterial = new THREE.MeshStandardMaterial({ color: 0x8B5E3C, roughness: 0.7 });
     const counter = new THREE.Mesh(counterGeometry, counterMaterial);
-    counter.position.set(-20, 0.5, -16);
+    counter.position.set(-22, 0.45, -17);
     counter.castShadow = true;
     counter.receiveShadow = true;
     scene.add(counter);
-    collisionBoxes.push({ x: -20, z: -16, w: 3, d: 1.5, y: 0.5, h: 1 });
+    collisionBoxes.push({ x: -22, z: -17, w: 2, d: 1, y: 0.45, h: 0.9 });
 
     const shelfLevels = [0.3, 0.9, 1.5];
     const shelfColor = 0x8B5E3C;
@@ -260,7 +271,7 @@
 
       shelfLevels.forEach((levelY, levelIdx) => {
         for (let shelfSide = 0; shelfSide < 2; shelfSide++) {
-          const shelfX = aisleCenterX + (shelfSide === 0 ? -0.75 : 0.75);
+          const shelfX = aisleCenterX + (shelfSide === 0 ? -0.6 : 0.6);
           const shelfZ = 0;
 
           const shelfGeometry = new THREE.BoxGeometry(0.4, 0.3, zLength);
@@ -290,6 +301,7 @@
               const variedMaterial = new THREE.MeshBasicMaterial({ color: variedColor });
               const dvdCase = new THREE.Mesh(caseGeometry, variedMaterial);
               dvdCase.position.set(shelfX, levelY + 0.2, zPos);
+              dvdCase.rotation.y = shelfSide === 0 ? Math.PI / 2 : -Math.PI / 2;
               dvdCase.userData = { genre };
               dvdCases.push(dvdCase);
               scene.add(dvdCase);
@@ -299,30 +311,31 @@
         }
       });
 
-      const signGeometry = new THREE.BoxGeometry(3, 1, 0.1);
-      const signMaterial = new THREE.MeshStandardMaterial({ color: backingColor });
-      const sign = new THREE.Mesh(signGeometry, signMaterial);
-      sign.position.set(aisleCenterX, 2, -16);
-      sign.castShadow = true;
-      scene.add(sign);
+      const signCanvas = document.createElement('canvas');
+      signCanvas.width = 256;
+      signCanvas.height = 256;
+      const signCtx = signCanvas.getContext('2d');
+      signCtx.fillStyle = '#003087';
+      signCtx.fillRect(0, 0, 256, 256);
+      signCtx.fillStyle = '#FFD600';
+      signCtx.font = 'bold 80px Arial';
+      signCtx.textAlign = 'center';
+      signCtx.textBaseline = 'middle';
+      signCtx.fillText(genre, 128, 128);
 
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 256;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#003087';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#FFD600';
-      ctx.font = 'bold 120px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(genre, canvas.width / 2, canvas.height / 2);
-
-      const texture = new THREE.CanvasTexture(canvas);
-      const signTextMaterial = new THREE.MeshStandardMaterial({ map: texture });
-      const signText = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 0.05), signTextMaterial);
-      signText.position.set(aisleCenterX, 2, -15.95);
-      scene.add(signText);
+      const signTexture = new THREE.CanvasTexture(signCanvas);
+      const cubeGeometry = new THREE.BoxGeometry(1.5, 0.5, 1.5);
+      const cubeMaterials = [
+        new THREE.MeshBasicMaterial({ map: signTexture }),
+        new THREE.MeshBasicMaterial({ map: signTexture }),
+        new THREE.MeshBasicMaterial({ map: signTexture }),
+        new THREE.MeshBasicMaterial({ map: signTexture }),
+        new THREE.MeshBasicMaterial({ map: signTexture }),
+        new THREE.MeshBasicMaterial({ map: signTexture })
+      ];
+      const signCube = new THREE.Mesh(cubeGeometry, cubeMaterials);
+      signCube.position.set(aisleCenterX, 3.8, 0);
+      scene.add(signCube);
 
       const pointLight = new THREE.PointLight(genreLightColors[genre], 0.3, 8);
       pointLight.position.set(aisleCenterX, 3, 0);
@@ -331,10 +344,50 @@
       scene.add(pointLight);
     });
 
+    // Add side wall shelves (left and right walls)
+    [[-28, 0], [28, 1]].forEach(([wallX, _]) => {
+      shelfLevels.forEach((levelY) => {
+        const shelfGeometry = new THREE.BoxGeometry(0.4, 0.3, zLength);
+        const shelfMaterial = new THREE.MeshStandardMaterial({ color: shelfColor, roughness: 0.7 });
+        const shelf = new THREE.Mesh(shelfGeometry, shelfMaterial);
+        shelf.position.set(wallX, levelY, 0);
+        shelf.castShadow = true;
+        shelf.receiveShadow = true;
+        scene.add(shelf);
+
+        const backingGeometry = new THREE.BoxGeometry(0.05, 0.5, zLength);
+        const backingMaterial = new THREE.MeshStandardMaterial({ color: backingColor, roughness: 0.6 });
+        const backing = new THREE.Mesh(backingGeometry, backingMaterial);
+        backing.position.set(wallX + (wallX < 0 ? 0.225 : -0.225), levelY, 0);
+        backing.castShadow = true;
+        scene.add(backing);
+
+        collisionBoxes.push({ x: wallX, z: 0, w: 0.4, d: zLength, y: levelY, h: 0.3 });
+
+        const casesPerShelf = Math.floor(zLength / 0.38);
+        for (let i = 0; i < casesPerShelf; i++) {
+          const zPos = zStart + i * 0.38 + 0.19;
+          if (Math.abs(zPos) <= zLength / 2) {
+            const caseGeometry = new THREE.BoxGeometry(0.38, 0.4, 0.05);
+            const variance = 0.8 + (Math.random() - 0.5) * 0.4;
+            const defaultColor = 0x2a2a2a;
+            const variedColor = new THREE.Color(defaultColor).multiplyScalar(variance);
+            const variedMaterial = new THREE.MeshBasicMaterial({ color: variedColor });
+            const dvdCase = new THREE.Mesh(caseGeometry, variedMaterial);
+            dvdCase.position.set(wallX, levelY + 0.2, zPos);
+            dvdCase.rotation.y = wallX < 0 ? Math.PI / 2 : -Math.PI / 2;
+            dvdCases.push(dvdCase);
+            scene.add(dvdCase);
+            totalDVDCases++;
+          }
+        }
+      });
+    });
+
     console.log(`Total DVD cases placed: ${totalDVDCases}`);
 
 
-    const postColor = 0x3a3a3a;
+    const postColor = 0x333333;
     aislePositionsX.forEach(aisleCenterX => {
       for (let z of [-10, 10]) {
         const postGeometry = new THREE.BoxGeometry(0.1, 4.5, 0.1);
