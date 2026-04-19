@@ -246,8 +246,9 @@
     const textureQueue = new Map();
 
     function applyTexture(mesh, texture) {
-      mesh.material[4] = new THREE.MeshBasicMaterial({ map: texture });
-      mesh.material[4].needsUpdate = true;
+      const mats = mesh.material.slice();
+      mats[4] = new THREE.MeshBasicMaterial({ map: texture });
+      mesh.material = mats;
     }
 
     function loadTexture(uid, mesh) {
