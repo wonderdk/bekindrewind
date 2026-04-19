@@ -353,12 +353,9 @@
     const shelfLevels = [0.3, 0.9, 1.5];
     const shelfColor = 0x8B5E3C;
     const backingColor = 0x003087;
-    let totalDVDCases = 0;
-    const dvdCases = [];
-
-    const zStart = -14;
-    const zEnd = 18;
-    const zLength = zEnd - zStart;
+    let totalDVDInstances = 0;
+    const instancedMeshList = [];
+    const instancedMeshes = {};
 
     function createShelfUnit(centerX, aisleBefore, aisleAfter) {
       const backPanelGeometry = new THREE.BoxGeometry(0.15, 1.8, 32);
@@ -382,20 +379,23 @@
           scene.add(leftShelf);
           collisionBoxes.push({ x: leftShelfX, z: 0, w: 0.4, d: 32, y: levelY, h: 0.06 });
 
-          const casesPerBoard = Math.floor(32 / 0.05);
-          for (let i = 0; i < casesPerBoard; i++) {
-            const zPos = -14 + i * 0.05;
-            const caseGeometry = new THREE.BoxGeometry(0.38, 0.4, 0.05);
-            const variance = 0.8 + (Math.random() - 0.5) * 0.4;
-            const variedColor = new THREE.Color(genreColors[aisleBefore]).multiplyScalar(variance);
-            const variedMaterial = new THREE.MeshBasicMaterial({ color: variedColor });
-            const dvdCase = new THREE.Mesh(caseGeometry, variedMaterial);
-            dvdCase.position.set(centerX - 0.08, levelY + 0.21, zPos);
-            dvdCase.rotation.y = Math.PI;
-            dvdCase.userData = { genre: aisleBefore };
-            dvdCases.push(dvdCase);
-            scene.add(dvdCase);
-            totalDVDCases++;
+          const maxCases = 40;
+          const caseSpacing = 0.45;
+          const zStart = -13;
+          const zEnd = 17;
+          for (let i = 0; i < maxCases; i++) {
+            const zPos = zStart + i * caseSpacing;
+            if (zPos > zEnd) break;
+
+            if (!instancedMeshes[aisleBefore]) instancedMeshes[aisleBefore] = { left: [], right: [] };
+            instancedMeshes[aisleBefore].left.push({
+              x: centerX - 0.1,
+              y: levelY + 0.21,
+              z: zPos,
+              rotY: Math.PI,
+              genre: aisleBefore
+            });
+            totalDVDInstances++;
           }
         }
 
@@ -408,20 +408,23 @@
           scene.add(rightShelf);
           collisionBoxes.push({ x: rightShelfX, z: 0, w: 0.4, d: 32, y: levelY, h: 0.06 });
 
-          const casesPerBoard = Math.floor(32 / 0.05);
-          for (let i = 0; i < casesPerBoard; i++) {
-            const zPos = -14 + i * 0.05;
-            const caseGeometry = new THREE.BoxGeometry(0.38, 0.4, 0.05);
-            const variance = 0.8 + (Math.random() - 0.5) * 0.4;
-            const variedColor = new THREE.Color(genreColors[aisleAfter]).multiplyScalar(variance);
-            const variedMaterial = new THREE.MeshBasicMaterial({ color: variedColor });
-            const dvdCase = new THREE.Mesh(caseGeometry, variedMaterial);
-            dvdCase.position.set(centerX + 0.08, levelY + 0.21, zPos);
-            dvdCase.rotation.y = 0;
-            dvdCase.userData = { genre: aisleAfter };
-            dvdCases.push(dvdCase);
-            scene.add(dvdCase);
-            totalDVDCases++;
+          const maxCases = 40;
+          const caseSpacing = 0.45;
+          const zStart = -13;
+          const zEnd = 17;
+          for (let i = 0; i < maxCases; i++) {
+            const zPos = zStart + i * caseSpacing;
+            if (zPos > zEnd) break;
+
+            if (!instancedMeshes[aisleAfter]) instancedMeshes[aisleAfter] = { left: [], right: [] };
+            instancedMeshes[aisleAfter].right.push({
+              x: centerX + 0.1,
+              y: levelY + 0.21,
+              z: zPos,
+              rotY: 0,
+              genre: aisleAfter
+            });
+            totalDVDInstances++;
           }
         }
       });
@@ -432,6 +435,32 @@
       const aisleBefore = i > 0 ? genres[i - 1] : null;
       const aisleAfter = i < genres.length ? genres[i] : null;
       createShelfUnit(unitX, aisleBefore, aisleAfter);
+    }
+
+    const caseGeometry = new THREE.BoxGeometry(0.38, 0.4, 0.05);
+    for (const genre of genres) {
+      if (instancedMeshes[genre]) {
+        const allInstances = [...(instancedMeshes[genre].left || []), ...(instancedMeshes[genre].right || [])];
+        const variance = 0.8 + (Math.random() - 0.5) * 0.4;
+        const variedColor = new THREE.Color(genreColors[genre]).multiplyScalar(variance);
+        const variedMaterial = new THREE.MeshBasicMaterial({ color: variedColor });
+        const instancedMesh = new THREE.InstancedMesh(caseGeometry, variedMaterial, allInstances.length);
+        instancedMesh.userData.genre = genre;
+
+        const matrix = new THREE.Matrix4();
+        allInstances.forEach((instance, idx) => {
+          matrix.compose(
+            new THREE.Vector3(instance.x, instance.y, instance.z),
+            new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), instance.rotY),
+            new THREE.Vector3(1, 1, 1)
+          );
+          instancedMesh.setMatrixAt(idx, matrix);
+        });
+
+        instancedMesh.instanceMatrix.needsUpdate = true;
+        scene.add(instancedMesh);
+        instancedMeshList.push(instancedMesh);
+      }
     }
 
     for (let i = 0; i < aislePositionsX.length; i++) {
@@ -473,12 +502,12 @@
       scene.add(pointLight);
     }
 
-    console.log(`Total DVD cases placed: ${totalDVDCases}`);
+    console.log(`Total DVD case instances: ${totalDVDInstances}`);
 
 
     const keys = {};
     const playerVelocity = new THREE.Vector3();
-    const walkSpeed = 0.06;
+    const walkSpeed = 0.08;
     const mouseSensitivity = 0.001;
     let pitch = 0;
     let yaw = 0;
@@ -524,7 +553,7 @@
         }
       } else if (document.pointerLockElement === renderer.domElement) {
         raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(dvdCases);
+        const intersects = raycaster.intersectObjects(instancedMeshList);
         if (intersects.length > 0) {
           const genre = intersects[0].object.userData.genre;
           document.getElementById('dvdInfo').innerHTML = `
@@ -606,7 +635,7 @@
       }
 
       raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(dvdCases);
+      const intersects = raycaster.intersectObjects(instancedMeshList);
       if (intersects.length > 0 && document.pointerLockElement === null) {
         genreLabel.textContent = intersects[0].object.userData.genre;
         genreLabel.style.display = 'block';
