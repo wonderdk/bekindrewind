@@ -126,7 +126,7 @@
     renderer.shadowMap.type = THREE.PCFShadowShadowMap;
     document.body.appendChild(renderer.domElement);
 
-    const ambientLight = new THREE.AmbientLight(0x333322, 1.2);
+    const ambientLight = new THREE.AmbientLight(0x333322, 1.5);
     scene.add(ambientLight);
 
     const genres = ['Horror', 'Drama', 'Action', 'Thriller', 'Sci-Fi', 'Comedy'];
@@ -355,7 +355,7 @@
     let totalDVDCases = 0;
     const dvdCases = [];
 
-    const zStart = -18;
+    const zStart = -14;
     const zEnd = 18;
     const zLength = zEnd - zStart;
     const checkoutMinX = -30;
@@ -369,7 +369,9 @@
 
       shelfLevels.forEach((levelY, levelIdx) => {
         for (let shelfSide = 0; shelfSide < 2; shelfSide++) {
-          const shelfX = aisleCenterX + (shelfSide === 0 ? -0.6 : 0.6);
+          const isOutermost = aisleCenterX === -25 || aisleCenterX === 25;
+          const spacing = isOutermost ? 0.6 : 0.3;
+          const shelfX = aisleCenterX + (shelfSide === 0 ? -spacing : spacing);
           const shelfZ = 0;
 
           const isInCheckout = aisleCenterX >= checkoutMinX && aisleCenterX <= checkoutMaxX;
@@ -411,7 +413,7 @@
               const variedMaterial = new THREE.MeshBasicMaterial({ color: variedColor });
               const dvdCase = new THREE.Mesh(caseGeometry, variedMaterial);
               dvdCase.position.set(shelfX, levelY + 0.2, zPos);
-              dvdCase.rotation.y = shelfSide === 0 ? Math.PI : 0;
+              dvdCase.rotation.y = shelfSide === 0 ? 0 : Math.PI;
               dvdCase.userData = { genre };
               dvdCases.push(dvdCase);
               scene.add(dvdCase);
@@ -446,7 +448,7 @@
         textMaterial
       ];
       const signCube = new THREE.Mesh(cubeGeometry, cubeMaterials);
-      signCube.position.set(aisleCenterX, 3.2, 0);
+      signCube.position.set(aisleCenterX, 3.0, 0);
       scene.add(signCube);
 
       const pointLight = new THREE.PointLight(genreLightColors[genre], 0.3, 8);
@@ -454,46 +456,6 @@
       pointLight.decay = 2;
       pointLight.castShadow = true;
       scene.add(pointLight);
-    });
-
-    // Add side wall shelves (left and right walls)
-    [[-29.6, 0], [29.6, 1]].forEach(([wallX, _]) => {
-      shelfLevels.forEach((levelY) => {
-        const shelfGeometry = new THREE.BoxGeometry(0.4, 0.3, zLength);
-        const shelfMaterial = new THREE.MeshStandardMaterial({ color: shelfColor, roughness: 0.7 });
-        const shelf = new THREE.Mesh(shelfGeometry, shelfMaterial);
-        shelf.position.set(wallX, levelY, 0);
-        shelf.castShadow = true;
-        shelf.receiveShadow = true;
-        scene.add(shelf);
-
-        const backingGeometry = new THREE.BoxGeometry(0.05, 0.5, zLength);
-        const backingMaterial = new THREE.MeshStandardMaterial({ color: backingColor, roughness: 0.6 });
-        const backing = new THREE.Mesh(backingGeometry, backingMaterial);
-        backing.position.set(wallX < 0 ? -29.6 + 0.025 : 29.6 - 0.025, levelY, 0);
-        backing.castShadow = true;
-        scene.add(backing);
-
-        collisionBoxes.push({ x: wallX, z: 0, w: 0.4, d: zLength, y: levelY, h: 0.3 });
-
-        const casesPerShelf = Math.floor(zLength / 0.38);
-        for (let i = 0; i < casesPerShelf; i++) {
-          const zPos = zStart + i * 0.38 + 0.19;
-          if (Math.abs(zPos) <= zLength / 2) {
-            const caseGeometry = new THREE.BoxGeometry(0.38, 0.4, 0.05);
-            const variance = 0.8 + (Math.random() - 0.5) * 0.4;
-            const defaultColor = 0x2a2a2a;
-            const variedColor = new THREE.Color(defaultColor).multiplyScalar(variance);
-            const variedMaterial = new THREE.MeshBasicMaterial({ color: variedColor });
-            const dvdCase = new THREE.Mesh(caseGeometry, variedMaterial);
-            dvdCase.position.set(wallX, levelY + 0.2, zPos);
-            dvdCase.rotation.y = wallX < 0 ? 0 : Math.PI;
-            dvdCases.push(dvdCase);
-            scene.add(dvdCase);
-            totalDVDCases++;
-          }
-        }
-      });
     });
 
     console.log(`Total DVD cases placed: ${totalDVDCases}`);
