@@ -126,7 +126,7 @@
     renderer.shadowMap.type = THREE.PCFShadowShadowMap;
     document.body.appendChild(renderer.domElement);
 
-    const ambientLight = new THREE.AmbientLight(0x333322, 0.4);
+    const ambientLight = new THREE.AmbientLight(0x333322, 0.8);
     scene.add(ambientLight);
 
     const genres = ['Horror', 'Drama', 'Action', 'Thriller', 'Sci-Fi', 'Comedy'];
@@ -167,7 +167,7 @@
     scene.add(tiles);
 
     const ceilingGeometry = new THREE.PlaneGeometry(60, 40);
-    const ceilingMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.7 });
+    const ceilingMaterial = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.7 });
     const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
     ceiling.rotation.x = Math.PI / 2;
     ceiling.position.y = 4.5;
@@ -241,7 +241,7 @@
     counter.receiveShadow = true;
     scene.add(counter);
 
-    const shelfLevels = [0.3, 0.9, 1.5];
+    const shelfLevels = [0.04, 0.64, 1.24];
     const shelfColor = 0x8B5E3C;
     const backingColor = 0x003087;
     let totalDVDCases = 0;
@@ -284,7 +284,7 @@
           const variedColor = new THREE.Color(dvdColor).multiplyScalar(variance);
           const variedMaterial = new THREE.MeshBasicMaterial({ color: variedColor });
           const dvdCase = new THREE.Mesh(case1Geo, variedMaterial);
-          dvdCase.position.set(aisleCenterX - 1 + (i - 1.5) * 0.39, level + 0.2, 0);
+          dvdCase.position.set(aisleCenterX - 1 + (i - 1.5) * 0.38, level + 0.2, 0);
           dvdCase.userData = { genre };
           dvdCases.push(dvdCase);
           scene.add(dvdCase);
@@ -297,7 +297,7 @@
           const variedColor = new THREE.Color(dvdColor).multiplyScalar(variance);
           const variedMaterial = new THREE.MeshBasicMaterial({ color: variedColor });
           const dvdCase = new THREE.Mesh(case2Geo, variedMaterial);
-          dvdCase.position.set(aisleCenterX + 1 + (i - 1.5) * 0.39, level + 0.2, 0);
+          dvdCase.position.set(aisleCenterX + 1 + (i - 1.5) * 0.38, level + 0.2, 0);
           dvdCase.userData = { genre };
           dvdCases.push(dvdCase);
           scene.add(dvdCase);
@@ -305,21 +305,21 @@
         }
       });
 
-      const signBackGeometry = new THREE.PlaneGeometry(1.2, 0.6);
+      const signBackGeometry = new THREE.PlaneGeometry(4, 1);
       const signBackMaterial = new THREE.MeshStandardMaterial({ color: backingColor });
       const signBack = new THREE.Mesh(signBackGeometry, signBackMaterial);
       const signZ = genres[aisle] === 'Sci-Fi' ? 8 : -14;
-      signBack.position.set(aisleCenterX, 2, signZ);
+      signBack.position.set(aisleCenterX, 2.5, signZ);
       signBack.castShadow = true;
       scene.add(signBack);
 
-      const signTextGeometry = new THREE.BoxGeometry(1.0, 0.4, 0.02);
+      const signTextGeometry = new THREE.BoxGeometry(3.6, 0.9, 0.02);
       const signTextMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD600 });
       const signText = new THREE.Mesh(signTextGeometry, signTextMaterial);
-      signText.position.set(aisleCenterX, 2, signZ + 0.03);
+      signText.position.set(aisleCenterX, 2.5, signZ + 0.03);
       scene.add(signText);
 
-      const pointLight = new THREE.PointLight(genreLightColors[genres[aisle]], 0.6, 15);
+      const pointLight = new THREE.PointLight(genreLightColors[genres[aisle]], 0.9, 15);
       pointLight.position.set(aisleCenterX, 4.3, 0);
       pointLight.castShadow = true;
       scene.add(pointLight);
@@ -334,7 +334,7 @@
           new THREE.BoxGeometry(1.5, 0.08, 0.3),
           new THREE.MeshStandardMaterial({ color: shelfColor, roughness: 0.7 })
         );
-        leftWallShelf.position.set(-28, level, -8 + i * 10);
+        leftWallShelf.position.set(-29.5, level, -8 + i * 10);
         leftWallShelf.castShadow = true;
         scene.add(leftWallShelf);
       }
@@ -344,7 +344,7 @@
           new THREE.BoxGeometry(1.5, 0.08, 0.3),
           new THREE.MeshStandardMaterial({ color: shelfColor, roughness: 0.7 })
         );
-        rightWallShelf.position.set(28, level, -8 + i * 10);
+        rightWallShelf.position.set(29.5, level, -8 + i * 10);
         rightWallShelf.castShadow = true;
         scene.add(rightWallShelf);
       }
@@ -441,7 +441,7 @@
     function animate() {
       requestAnimationFrame(animate);
 
-      const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+      const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
       const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
 
       playerVelocity.set(0, 0, 0);
