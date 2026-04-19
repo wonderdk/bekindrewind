@@ -250,16 +250,16 @@
     const counterGeometry = new THREE.BoxGeometry(4, 0.9, 1);
     const counterMaterial = new THREE.MeshStandardMaterial({ color: 0x8B5E3C, roughness: 0.7 });
     const counter = new THREE.Mesh(counterGeometry, counterMaterial);
-    counter.position.set(-10, 0.45, -17);
+    counter.position.set(-5, 0.45, -17);
     counter.castShadow = true;
     counter.receiveShadow = true;
     scene.add(counter);
-    collisionBoxes.push({ x: -10, z: -17, w: 4, d: 1, y: 0.45, h: 0.9 });
+    collisionBoxes.push({ x: -5, z: -17, w: 4, d: 1, y: 0.45, h: 0.9 });
 
     const registerGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.3);
     const registerMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 });
     const register = new THREE.Mesh(registerGeometry, registerMaterial);
-    register.position.set(-10, 1.1, -17);
+    register.position.set(-5, 1.1, -17);
     scene.add(register);
 
     const checkoutSignCanvas = document.createElement('canvas');
@@ -274,10 +274,11 @@
     checkoutCtx.textBaseline = 'middle';
     checkoutCtx.fillText('CHECKOUT', 256, 64);
     const checkoutSignTexture = new THREE.CanvasTexture(checkoutSignCanvas);
-    const checkoutSignGeometry = new THREE.PlaneGeometry(4, 0.8);
+    const checkoutSignGeometry = new THREE.PlaneGeometry(3, 0.6);
     const checkoutSignMaterial = new THREE.MeshBasicMaterial({ map: checkoutSignTexture });
     const checkoutSign = new THREE.Mesh(checkoutSignGeometry, checkoutSignMaterial);
-    checkoutSign.position.set(-10, 4.0, -16.5);
+    checkoutSign.position.set(-5, 3.8, -17);
+    checkoutSign.rotation.x = Math.PI / 2;
     scene.add(checkoutSign);
 
     const doorGeometry = new THREE.BoxGeometry(2, 2.8, 0.1);
@@ -389,7 +390,7 @@
             const variedColor = new THREE.Color(genreColors[aisleBefore]).multiplyScalar(variance);
             const variedMaterial = new THREE.MeshBasicMaterial({ color: variedColor });
             const dvdCase = new THREE.Mesh(caseGeometry, variedMaterial);
-            dvdCase.position.set(leftShelfX, levelY + 0.2, zPos);
+            dvdCase.position.set(centerX - 0.08, levelY + 0.21, zPos);
             dvdCase.rotation.y = Math.PI;
             dvdCase.userData = { genre: aisleBefore };
             dvdCases.push(dvdCase);
@@ -415,7 +416,7 @@
             const variedColor = new THREE.Color(genreColors[aisleAfter]).multiplyScalar(variance);
             const variedMaterial = new THREE.MeshBasicMaterial({ color: variedColor });
             const dvdCase = new THREE.Mesh(caseGeometry, variedMaterial);
-            dvdCase.position.set(rightShelfX, levelY + 0.2, zPos);
+            dvdCase.position.set(centerX + 0.08, levelY + 0.21, zPos);
             dvdCase.rotation.y = 0;
             dvdCase.userData = { genre: aisleAfter };
             dvdCases.push(dvdCase);
@@ -477,7 +478,7 @@
 
     const keys = {};
     const playerVelocity = new THREE.Vector3();
-    const walkSpeed = 0.04;
+    const walkSpeed = 0.06;
     const mouseSensitivity = 0.001;
     let pitch = 0;
     let yaw = 0;
@@ -521,6 +522,8 @@
           window.location.href = 'index.html';
           return;
         }
+      } else if (document.pointerLockElement === renderer.domElement) {
+        raycaster.setFromCamera(mouse, camera);
         const intersects = raycaster.intersectObjects(dvdCases);
         if (intersects.length > 0) {
           const genre = intersects[0].object.userData.genre;
