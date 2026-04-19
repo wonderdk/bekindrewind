@@ -246,14 +246,103 @@
     backStripe.position.set(0, 2.7, -20);
     scene.add(backStripe);
 
-    const counterGeometry = new THREE.BoxGeometry(2, 0.9, 1);
+    const counterGeometry = new THREE.BoxGeometry(4, 0.9, 1);
     const counterMaterial = new THREE.MeshStandardMaterial({ color: 0x8B5E3C, roughness: 0.7 });
     const counter = new THREE.Mesh(counterGeometry, counterMaterial);
     counter.position.set(-22, 0.45, -17);
     counter.castShadow = true;
     counter.receiveShadow = true;
     scene.add(counter);
-    collisionBoxes.push({ x: -22, z: -17, w: 2, d: 1, y: 0.45, h: 0.9 });
+    collisionBoxes.push({ x: -22, z: -17, w: 4, d: 1, y: 0.45, h: 0.9 });
+
+    const registerGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.3);
+    const registerMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 });
+    const register = new THREE.Mesh(registerGeometry, registerMaterial);
+    register.position.set(-22, 1.35, -17);
+    scene.add(register);
+
+    const checkoutSignCanvas = document.createElement('canvas');
+    checkoutSignCanvas.width = 256;
+    checkoutSignCanvas.height = 256;
+    const checkoutCtx = checkoutSignCanvas.getContext('2d');
+    checkoutCtx.fillStyle = '#003087';
+    checkoutCtx.fillRect(0, 0, 256, 256);
+    checkoutCtx.fillStyle = '#FFD600';
+    checkoutCtx.font = 'bold 50px Arial';
+    checkoutCtx.textAlign = 'center';
+    checkoutCtx.textBaseline = 'middle';
+    checkoutCtx.fillText('CHECKOUT', 128, 128);
+    const checkoutSignTexture = new THREE.CanvasTexture(checkoutSignCanvas);
+    const checkoutSignGeometry = new THREE.PlaneGeometry(2, 0.8);
+    const checkoutSignMaterial = new THREE.MeshBasicMaterial({ map: checkoutSignTexture });
+    const checkoutSign = new THREE.Mesh(checkoutSignGeometry, checkoutSignMaterial);
+    checkoutSign.position.set(-22, 3.5, -16.5);
+    checkoutSign.rotation.x = Math.PI / 12;
+    scene.add(checkoutSign);
+
+    const doorGeometry = new THREE.BoxGeometry(2, 3, 0.1);
+    const doorMaterial = new THREE.MeshBasicMaterial({ color: 0x444444 });
+    const leftDoor = new THREE.Mesh(doorGeometry, doorMaterial);
+    leftDoor.position.set(-0.5, 1.5, -20);
+    scene.add(leftDoor);
+    const rightDoor = new THREE.Mesh(doorGeometry, doorMaterial);
+    rightDoor.position.set(0.5, 1.5, -20);
+    scene.add(rightDoor);
+
+    const doorsGroup = new THREE.Group();
+    doorsGroup.add(leftDoor);
+    doorsGroup.add(rightDoor);
+    doorsGroup.userData = { clickable: true, href: 'index.html' };
+
+    const exitSignCanvas = document.createElement('canvas');
+    exitSignCanvas.width = 256;
+    exitSignCanvas.height = 256;
+    const exitCtx = exitSignCanvas.getContext('2d');
+    exitCtx.fillStyle = '#003087';
+    exitCtx.fillRect(0, 0, 256, 256);
+    exitCtx.fillStyle = '#FFD600';
+    exitCtx.font = 'bold 60px Arial';
+    exitCtx.textAlign = 'center';
+    exitCtx.textBaseline = 'middle';
+    exitCtx.fillText('EXIT', 128, 128);
+    const exitSignTexture = new THREE.CanvasTexture(exitSignCanvas);
+    const exitSignGeometry = new THREE.PlaneGeometry(1.5, 0.6);
+    const exitSignMaterial = new THREE.MeshBasicMaterial({ map: exitSignTexture });
+    const exitSign = new THREE.Mesh(exitSignGeometry, exitSignMaterial);
+    exitSign.position.set(0, 3.5, -19.9);
+    scene.add(exitSign);
+
+    const snackColors = [0xFF0000, 0xFFFF00, 0xFFA500, 0x00FF00, 0x800080];
+    for (let row = 0; row < 4; row++) {
+      let x = 5;
+      while (x < 28) {
+        const colorIdx = Math.floor(Math.random() * snackColors.length);
+        const snackGeometry = new THREE.BoxGeometry(0.2, 0.25, 0.1);
+        const snackMaterial = new THREE.MeshBasicMaterial({ color: snackColors[colorIdx] });
+        const snack = new THREE.Mesh(snackGeometry, snackMaterial);
+        snack.position.set(x, 0.3 + row * 0.3, -19.8);
+        scene.add(snack);
+        x += 0.22;
+      }
+    }
+
+    const snackSignCanvas = document.createElement('canvas');
+    snackSignCanvas.width = 256;
+    snackSignCanvas.height = 256;
+    const snackCtx = snackSignCanvas.getContext('2d');
+    snackCtx.fillStyle = '#003087';
+    snackCtx.fillRect(0, 0, 256, 256);
+    snackCtx.fillStyle = '#FFD600';
+    snackCtx.font = 'bold 50px Arial';
+    snackCtx.textAlign = 'center';
+    snackCtx.textBaseline = 'middle';
+    snackCtx.fillText('SNACKS', 128, 128);
+    const snackSignTexture = new THREE.CanvasTexture(snackSignCanvas);
+    const snackSignGeometry = new THREE.PlaneGeometry(1.5, 0.6);
+    const snackSignMaterial = new THREE.MeshBasicMaterial({ map: snackSignTexture });
+    const snackSign = new THREE.Mesh(snackSignGeometry, snackSignMaterial);
+    snackSign.position.set(16.5, 3.5, -19.9);
+    scene.add(snackSign);
 
     const shelfLevels = [0.3, 0.9, 1.5];
     const shelfColor = 0x8B5E3C;
@@ -264,6 +353,10 @@
     const zStart = -18;
     const zEnd = 18;
     const zLength = zEnd - zStart;
+    const checkoutMinX = -30;
+    const checkoutMaxX = -15;
+    const checkoutMinZ = -20;
+    const checkoutMaxZ = -14;
 
     aislePositionsX.forEach((aisleCenterX, aisle) => {
       const genre = genres[aisle];
@@ -271,8 +364,11 @@
 
       shelfLevels.forEach((levelY, levelIdx) => {
         for (let shelfSide = 0; shelfSide < 2; shelfSide++) {
-          const shelfX = aisleCenterX + (shelfSide === 0 ? -0.6 : 0.6);
+          const shelfX = aisleCenterX + (shelfSide === 0 ? -0.45 : 0.45);
           const shelfZ = 0;
+
+          const isInCheckout = aisleCenterX >= checkoutMinX && aisleCenterX <= checkoutMaxX;
+          if (isInCheckout) continue;
 
           const shelfGeometry = new THREE.BoxGeometry(0.4, 0.3, zLength);
           const shelfMaterial = new THREE.MeshStandardMaterial({ color: shelfColor, roughness: 0.7 });
@@ -285,9 +381,18 @@
           const backingGeometry = new THREE.BoxGeometry(0.05, 0.5, zLength);
           const backingMaterial = new THREE.MeshStandardMaterial({ color: backingColor, roughness: 0.6 });
           const backing = new THREE.Mesh(backingGeometry, backingMaterial);
-          backing.position.set(shelfX - 0.225, levelY, shelfZ);
+          backing.position.set(shelfX - (shelfSide === 0 ? 0.225 : -0.225), levelY, shelfZ);
           backing.castShadow = true;
           scene.add(backing);
+
+          const endCapGeometry = new THREE.BoxGeometry(0.4, 1.6, 0.4);
+          const endCapMaterial = new THREE.MeshStandardMaterial({ color: shelfColor, roughness: 0.7 });
+          const leftEndCap = new THREE.Mesh(endCapGeometry, endCapMaterial);
+          leftEndCap.position.set(shelfX, levelY + 0.65, zStart + 0.2);
+          scene.add(leftEndCap);
+          const rightEndCap = new THREE.Mesh(endCapGeometry, endCapMaterial);
+          rightEndCap.position.set(shelfX, levelY + 0.65, zEnd - 0.2);
+          scene.add(rightEndCap);
 
           collisionBoxes.push({ x: shelfX, z: shelfZ, w: 0.4, d: zLength, y: levelY, h: 0.3 });
 
@@ -301,7 +406,7 @@
               const variedMaterial = new THREE.MeshBasicMaterial({ color: variedColor });
               const dvdCase = new THREE.Mesh(caseGeometry, variedMaterial);
               dvdCase.position.set(shelfX, levelY + 0.2, zPos);
-              dvdCase.rotation.y = shelfSide === 0 ? Math.PI / 2 : -Math.PI / 2;
+              dvdCase.rotation.y = shelfSide === 0 ? 0 : Math.PI;
               dvdCase.userData = { genre };
               dvdCases.push(dvdCase);
               scene.add(dvdCase);
@@ -318,23 +423,24 @@
       signCtx.fillStyle = '#003087';
       signCtx.fillRect(0, 0, 256, 256);
       signCtx.fillStyle = '#FFD600';
-      signCtx.font = 'bold 80px Arial';
+      signCtx.font = 'bold 60px Arial';
       signCtx.textAlign = 'center';
       signCtx.textBaseline = 'middle';
       signCtx.fillText(genre, 128, 128);
 
       const signTexture = new THREE.CanvasTexture(signCanvas);
-      const cubeGeometry = new THREE.BoxGeometry(1.5, 0.5, 1.5);
+      const cubeGeometry = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+      const navyMaterial = new THREE.MeshBasicMaterial({ color: 0x003087 });
       const cubeMaterials = [
+        navyMaterial,
+        navyMaterial,
         new THREE.MeshBasicMaterial({ map: signTexture }),
         new THREE.MeshBasicMaterial({ map: signTexture }),
-        new THREE.MeshBasicMaterial({ map: signTexture }),
-        new THREE.MeshBasicMaterial({ map: signTexture }),
-        new THREE.MeshBasicMaterial({ map: signTexture }),
-        new THREE.MeshBasicMaterial({ map: signTexture })
+        navyMaterial,
+        navyMaterial
       ];
       const signCube = new THREE.Mesh(cubeGeometry, cubeMaterials);
-      signCube.position.set(aisleCenterX, 3.8, 0);
+      signCube.position.set(aisleCenterX, 3.2, 0);
       scene.add(signCube);
 
       const pointLight = new THREE.PointLight(genreLightColors[genre], 0.3, 8);
@@ -345,7 +451,7 @@
     });
 
     // Add side wall shelves (left and right walls)
-    [[-28, 0], [28, 1]].forEach(([wallX, _]) => {
+    [[-29.6, 0], [29.6, 1]].forEach(([wallX, _]) => {
       shelfLevels.forEach((levelY) => {
         const shelfGeometry = new THREE.BoxGeometry(0.4, 0.3, zLength);
         const shelfMaterial = new THREE.MeshStandardMaterial({ color: shelfColor, roughness: 0.7 });
@@ -358,7 +464,7 @@
         const backingGeometry = new THREE.BoxGeometry(0.05, 0.5, zLength);
         const backingMaterial = new THREE.MeshStandardMaterial({ color: backingColor, roughness: 0.6 });
         const backing = new THREE.Mesh(backingGeometry, backingMaterial);
-        backing.position.set(wallX + (wallX < 0 ? 0.225 : -0.225), levelY, 0);
+        backing.position.set(wallX < 0 ? -29.6 + 0.025 : 29.6 - 0.025, levelY, 0);
         backing.castShadow = true;
         scene.add(backing);
 
@@ -375,7 +481,7 @@
             const variedMaterial = new THREE.MeshBasicMaterial({ color: variedColor });
             const dvdCase = new THREE.Mesh(caseGeometry, variedMaterial);
             dvdCase.position.set(wallX, levelY + 0.2, zPos);
-            dvdCase.rotation.y = wallX < 0 ? Math.PI / 2 : -Math.PI / 2;
+            dvdCase.rotation.y = wallX < 0 ? 0 : Math.PI;
             dvdCases.push(dvdCase);
             scene.add(dvdCase);
             totalDVDCases++;
@@ -387,10 +493,10 @@
     console.log(`Total DVD cases placed: ${totalDVDCases}`);
 
 
-    const postColor = 0x333333;
+    const postColor = 0x222222;
     aislePositionsX.forEach(aisleCenterX => {
       for (let z of [-10, 10]) {
-        const postGeometry = new THREE.BoxGeometry(0.1, 4.5, 0.1);
+        const postGeometry = new THREE.BoxGeometry(0.08, 4.5, 0.08);
         const postMaterial = new THREE.MeshBasicMaterial({ color: postColor });
         const leftPost = new THREE.Mesh(postGeometry, postMaterial);
         leftPost.position.set(aisleCenterX - 1.2, 2.25, z);
@@ -445,6 +551,11 @@
     document.addEventListener('click', (e) => {
       if (document.pointerLockElement !== renderer.domElement) {
         raycaster.setFromCamera(mouse, camera);
+        const doorIntersects = raycaster.intersectObjects([leftDoor, rightDoor]);
+        if (doorIntersects.length > 0) {
+          window.location.href = 'index.html';
+          return;
+        }
         const intersects = raycaster.intersectObjects(dvdCases);
         if (intersects.length > 0) {
           const genre = intersects[0].object.userData.genre;
