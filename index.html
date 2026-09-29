@@ -406,6 +406,9 @@ async function loadMovies() {
     const res = await fetch(CSV_URL + '?t=' + Date.now());
     const text = await res.text();
     movies = parseCSV(text);
+    // Tonight shelf is keyed on uid now; drop any stale imdb_id entries from older versions
+    tonight = new Set([...tonight].filter(id => movies.some(m => m.uid === id)));
+    localStorage.setItem('tonight', JSON.stringify([...tonight]));
     document.getElementById('total').textContent = movies.filter(m => m.hidden !== 'true').length;
     renderGrid();
     populateGenres();
@@ -468,7 +471,7 @@ function renderGrid() {
   const visible = getFiltered();
   document.getElementById('shelf-count').textContent = visible.length + ' titles';
   document.getElementById('grid').innerHTML = visible.map((m,i) => `
-    <div class="card ${tonight.has(m.imdb_id)?'queued':''}" id="c-${m.imdb_id}" onclick="openDetail('${m.imdb_id}')">
+    <div class="card ${tonight.has(m.uid)?'queued':''}" id="c-${m.uid}" onclick="openDetail('${m.uid}')">
       <div class="poster" style="background:#${['1a0a0a','0a1a0a','0a0a1a','1a1a0a','1a0a1a','0a1a1a'][i%6]}">
         <div class="scanlines"></div>
         ${m.poster_url ? `<img src="${m.poster_url}" alt="${m.title}" onerror="this.style.display='none'">` : ''}
@@ -482,8 +485,8 @@ function renderGrid() {
           <div class="card-title">${m.title}</div>
           <div class="card-year">${m.year}</div>
         </div>
-        <button class="star-btn" onclick="event.stopPropagation();toggleTonight('${m.imdb_id}')" title="Add to tonight">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="${tonight.has(m.imdb_id)?'#FFD600':'none'}" stroke="#FFD600" stroke-width="1.2">
+        <button class="star-btn" onclick="event.stopPropagation();toggleTonight('${m.uid}')" title="Add to tonight">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="${tonight.has(m.uid)?'#FFD600':'none'}" stroke="#FFD600" stroke-width="1.2">
             <polygon points="6,1 7.5,4.5 11.5,4.8 8.7,7.3 9.6,11.2 6,9.1 2.4,11.2 3.3,7.3 0.5,4.8 4.5,4.5"/>
           </svg>
         </button>
@@ -497,7 +500,7 @@ function renderTonight() {
   if (tonight.size > 0) { badge.style.display='flex'; badge.textContent=tonight.size; }
   else { badge.style.display='none'; }
   if (currentView !== 'tonight') return;
-  const picked = movies.filter(m => tonight.has(m.imdb_id));
+  const picked = movies.filter(m => tonight.has(m.uid));
   const el = document.getElementById('tonight-content');
   if (picked.length === 0) {
     el.innerHTML = '<div class="tonight-empty">Nothing on the shelf yet.<br>Star a film from the collection to add it here.</div>';
@@ -519,7 +522,7 @@ function renderTonight() {
           <span>${m.director}</span>
         </div>
       </div>
-      <button class="tonight-remove" onclick="toggleTonight('${m.imdb_id}')">×</button>
+      <button class="tonight-remove" onclick="toggleTonight('${m.uid}')">×</button>
     </div>
   `).join('') + '</div>';
 }
@@ -562,9 +565,10 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-async function openDetail(imdbId) {
-  const m = movies.find(m => m.imdb_id === imdbId);
+async function openDetail(uid) {
+  const m = movies.find(m => m.uid === uid);
   if (!m) return;
+  const imdbId = m.imdb_id;
   document.getElementById('view-collection').classList.add('hidden');
   document.getElementById('view-tonight').classList.add('hidden');
   const el = document.getElementById('view-detail');
@@ -720,8 +724,8 @@ async function queueFilm(tmdbId) {
     const hdrs = { Authorization: `Bearer ${TMDB_TOKEN}` };
     const d = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}?append_to_response=credits,external_ids,translations`, { headers: hdrs }).then(r => r.json());
     const imdbId = d.external_ids?.imdb_id || '';
-    if (imdbId && movies.some(m => m.imdb_id === imdbId)) {
-      alert(`"${d.title}" is already in the collection.`);
+    if (imdbId && movies.some(m => m.imdb_id === imdbId && m.format === fmt)) {
+      alert(`"${d.title}" is already in the collection on ${fmt}.`);
       if (btn) { btn.textContent = 'Add'; btn.disabled = false; }
       return;
     }
