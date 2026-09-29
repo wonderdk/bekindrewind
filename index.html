@@ -227,6 +227,22 @@
 </div>
 <div id="add-toast" class="add-toast"></div>
 
+<div id="token-modal" class="modal-overlay" onclick="if(event.target===this)cancelToken()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">GitHub Token</div>
+      <button class="modal-close" onclick="cancelToken()">×</button>
+    </div>
+    <div style="padding:14px 20px;color:#9BA3C4;font-size:12px;line-height:1.6">
+      Paste a fine-grained personal access token with <strong style="color:#e8ecf8">Contents: Read and write</strong> on the bekindrewind repo. It is stored only in this browser.
+    </div>
+    <div class="modal-search-row" style="border-top:1px solid #2a3460">
+      <input type="password" id="token-input" class="modal-input" placeholder="github_pat_…" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')saveToken()">
+      <button class="modal-search-btn" onclick="saveToken()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div id="view-collection">
   <div class="toolbar">
     <div class="search-wrap">
@@ -295,10 +311,28 @@ let currentView = 'collection';
 let sort = 'title-asc';
 let pendingAdds = [];
 
+let tokenResolve = null;
 function promptToken() {
-  const t = prompt('Enter your GitHub Personal Access Token:');
-  if (t) { GH_TOKEN = t.trim(); localStorage.setItem('gh_token', GH_TOKEN); }
-  return !!GH_TOKEN;
+  return new Promise(resolve => {
+    tokenResolve = resolve;
+    const m = document.getElementById('token-modal');
+    const inp = document.getElementById('token-input');
+    inp.value = '';
+    m.style.display = 'flex';
+    setTimeout(() => inp.focus(), 50);
+  });
+}
+function saveToken() {
+  const t = document.getElementById('token-input').value.trim();
+  if (!t) return;
+  GH_TOKEN = t;
+  localStorage.setItem('gh_token', GH_TOKEN);
+  document.getElementById('token-modal').style.display = 'none';
+  if (tokenResolve) { tokenResolve(true); tokenResolve = null; }
+}
+function cancelToken() {
+  document.getElementById('token-modal').style.display = 'none';
+  if (tokenResolve) { tokenResolve(false); tokenResolve = null; }
 }
 
 function buildCsv(list) {
@@ -336,7 +370,7 @@ async function githubWrite(csv, message) {
 }
 
 async function toggleWatched(uid) {
-  if (!GH_TOKEN && !promptToken()) return;
+  if (!GH_TOKEN && !(await promptToken())) return;
   const m = movies.find(m => m.uid === uid);
   if (!m) return;
   m.watched = m.watched === 'true' ? 'false' : 'true';
@@ -674,7 +708,7 @@ function closeAddModal() {
   document.getElementById('add-modal').style.display = 'none';
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAddModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAddModal(); cancelToken(); } });
 
 async function searchFilmTMDB() {
   const q = document.getElementById('modal-query').value.trim();
@@ -780,7 +814,7 @@ function renderQueue() {
 // One GitHub write, one commit, for everything in the queue
 async function commitAdds() {
   if (!pendingAdds.length) return;
-  if (!GH_TOKEN && !promptToken()) return;
+  if (!GH_TOKEN && !(await promptToken())) return;
   const saveBtn = document.getElementById('modal-save-btn');
   saveBtn.disabled = true;
   saveBtn.textContent = 'Saving…';
