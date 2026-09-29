@@ -129,7 +129,16 @@
 .danger-btn:hover{background:#2a0a0a}
 .offline-note{background:#2a2200;border-bottom:1px solid #FFD600;color:#FFD600;font-size:11px;padding:5px 16px;text-align:center;display:none}
 .modal-kind-select{background:#1a2240;border:1px solid #2a3460;color:#9BA3C4;font-size:12px;padding:0 8px;border-radius:4px;outline:none;cursor:pointer}
-@media(max-width:600px){ nav{gap:0} .nav-item{padding:5px 8px;font-size:12px} .stat{display:none} }
+html,body{overflow-x:hidden;max-width:100%}
+@media(max-width:600px){
+  header{padding:0 10px;gap:6px}
+  .logo{gap:0}
+  .logo-text{display:none}
+  nav{gap:0;flex:1;justify-content:center;min-width:0}
+  .nav-item{padding:6px 7px;font-size:12px;white-space:nowrap}
+  .stat{display:none}
+  .add-btn{width:30px;height:30px}
+}
 /* ── Detail view ── */
 .detail-view{min-height:100vh}
 .detail-backdrop-wrap{position:relative;height:320px;overflow:hidden;background:#111827;flex-shrink:0}
@@ -240,7 +249,6 @@
   </nav>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="stat"><strong id="total">0</strong> titles</div>
-    <button class="clear-btn" id="backfill-btn" style="display:none" onclick="backfillRatings()" title="Fetch TMDB ratings for films that have none">Fetch ratings</button>
     <button class="add-btn" onclick="openAddModal()" title="Add film">+</button>
   </div>
 </header>
@@ -588,7 +596,6 @@ async function loadMovies() {
     renderGrid();
     populateGenres();
     populateBoxsets();
-    updateBackfillBtn();
   } catch(e) {
     document.getElementById('grid').innerHTML = '<p style="color:#556080;padding:20px">Could not load collection.</p>';
   }
@@ -804,7 +811,7 @@ async function removeFromWishlist(uid, skipConfirm) {
   else { m.hidden = ''; }
 }
 function afterDataChange() {
-  refreshCounts(); renderGrid(); populateGenres(); populateBoxsets(); updateBackfillBtn();
+  refreshCounts(); renderGrid(); populateGenres(); populateBoxsets();
   if (currentView === 'wishlist') renderWishlist();
   if (currentView === 'stats') renderStats();
   renderTonight();
@@ -1191,52 +1198,6 @@ async function commitAdds() {
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = 'Save to collection';
-  }
-}
-
-function updateBackfillBtn() {
-  const btn = document.getElementById('backfill-btn');
-  if (!btn) return;
-  const missing = movies.filter(m => m.hidden !== 'true' && m.imdb_id && !fmtRating(m.tmdb_rating)).length;
-  btn.style.display = missing ? 'inline-block' : 'none';
-  btn.textContent = `Fetch ratings (${missing})`;
-}
-
-// One-time backfill: fetch TMDB vote_average for every row without a rating,
-// then write the CSV back as a single commit.
-async function backfillRatings() {
-  const btn = document.getElementById('backfill-btn');
-  const todo = movies.filter(m => m.hidden !== 'true' && m.imdb_id && !fmtRating(m.tmdb_rating));
-  if (!todo.length) return;
-  if (!GH_TOKEN && !(await promptToken())) return;
-  if (!TMDB_TOKEN && !(await promptToken('tmdb'))) return;
-  btn.disabled = true;
-  let done = 0, failed = 0;
-  const seen = {};
-  for (const m of todo) {
-    btn.textContent = `Fetching ${done + 1}/${todo.length}…`;
-    try {
-      if (!(m.imdb_id in seen)) {
-        const f = await tmdbFetch(`/find/${m.imdb_id}?external_source=imdb_id`);
-        const hit = f.movie_results?.[0] || f.tv_results?.[0];
-        seen[m.imdb_id] = hit ? fmtRating(hit.vote_average) : '';
-      }
-      m.tmdb_rating = seen[m.imdb_id];
-      if (!m.tmdb_rating) failed++;
-    } catch(e) { console.warn('Rating fetch failed for', m.title, e); failed++; if (!TMDB_TOKEN) break; }
-    done++;
-    await new Promise(r => setTimeout(r, 60));
-  }
-  btn.textContent = 'Saving…';
-  try {
-    await githubWrite(buildCsv(movies), `Backfill TMDB ratings (${done - failed} films)`);
-    renderGrid();
-    showAddToast(`Ratings saved for ${done - failed} films${failed ? `, ${failed} not found` : ''}`);
-  } catch(e) {
-    alert('Ratings fetched but could not save to GitHub.\n\n' + e.message);
-  } finally {
-    btn.disabled = false;
-    updateBackfillBtn();
   }
 }
 
