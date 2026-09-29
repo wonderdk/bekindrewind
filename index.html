@@ -95,7 +95,6 @@
   .bb-header{padding:0 12px;}
   .toolbar{padding:8px 12px;}
   .bb-search{width:100%;max-width:100%;}
-  .toolbar select{flex:1;min-width:0;}
   .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}
   .unwatched-label{font-size:11px;}
 }
@@ -131,6 +130,11 @@
 .modal-kind-select{background:#1a2240;border:1px solid #2a3460;color:#9BA3C4;font-size:12px;padding:0 8px;border-radius:4px;outline:none;cursor:pointer}
 html,body{overflow-x:hidden;max-width:100%}
 @media(max-width:600px){
+  .toolbar{padding:8px 12px 10px}
+  .toolbar-right{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .toolbar-select{width:100%;min-width:0;padding:8px 10px;font-size:13px}
+  .unwatched-label{grid-column:1/-1;justify-content:flex-start;padding:2px 2px 0;font-size:13px}
+  .unwatched-label input{width:16px;height:16px}
   header{padding:0 10px;gap:6px}
   .logo{gap:0}
   .logo-text{display:none}
@@ -320,7 +324,7 @@ html,body{overflow-x:hidden;max-width:100%}
       <select id="boxset-select" class="toolbar-select" onchange="setBoxset(this.value)">
         <option value="all">All box sets</option>
       </select>
-     <select id="sort-select" onchange="setSort(this.value)" style="background:#0f1628;border:1px solid #2a3460;color:#9BA3C4;font-size:12px;padding:5px 10px;border-radius:3px;cursor:pointer;outline:none;">
+      <select id="sort-select" class="toolbar-select" onchange="setSort(this.value)">
         <option value="title-asc">Title A-Z</option>
         <option value="title-desc">Title Z-A</option>
         <option value="year-desc">Year newest</option>
