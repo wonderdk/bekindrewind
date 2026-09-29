@@ -357,7 +357,15 @@ async function githubWrite(csv, message) {
     throw new Error(`GitHub rejected the token (HTTP ${meta.status}). The saved token was cleared; you will be asked for a new one on the next save. Check that the token has "Contents: Read and write" permission on the repo.`);
   }
   if (!meta.ok) throw new Error(`Could not read movies.csv metadata (HTTP ${meta.status}).`);
-  const { sha } = await meta.json();
+  const { sha, content } = await meta.json();
+  // Guard: never overwrite the file with fewer rows than it currently has.
+  if (content) {
+    const remoteRows = parseCSV(decodeURIComponent(escape(atob(content.replace(/\n/g, '')))), false).length;
+    const localRows = parseCSV(csv, false).length;
+    if (localRows < remoteRows) {
+      throw new Error(`Refusing to save: movies.csv on GitHub has ${remoteRows} rows but this page only has ${localRows}. Reload the page to pick up the latest version, then try again.`);
+    }
+  }
   const res = await fetch(GITHUB_API, {
     method: 'PUT',
     headers: { Authorization: `token ${GH_TOKEN}`, 'Content-Type': 'application/json' },
@@ -387,32 +395,36 @@ async function toggleWatched(uid) {
   }
 }
 
-function parseCSV(text) {
-  const rows = [];
-  const lines = text.trim().split('\n');
-  const headers = lines[0].replace(/"/g, '').split(',').map(h => h.trim());
-  if (headers.length > 1) csvFields = headers;
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    const vals = [];
-    let cur = '';
-    let inQ = false;
-    for (let j = 0; j < line.length; j++) {
-      const c = line[j];
-      if (c === '"') {
-        if (inQ && line[j+1] === '"') { cur += '"'; j++; continue; }
-        inQ = !inQ; continue;
-      }
-      if (c === ',' && !inQ) { vals.push(cur.trim()); cur = ''; continue; }
-      cur += c;
-    }
-    vals.push(cur.trim());
-    if (vals.length < headers.length) continue;
-    const obj = {};
-    headers.forEach((h, idx) => obj[h] = vals[idx] || '');
-    rows.push(obj);
+// RFC 4180 parser: handles quoted commas, quoted newlines and "" escapes.
+// Short rows are padded, never dropped, so nothing disappears on the next write.
+function parseCSV(text, updateFields = true) {
+  const records = [];
+  let row = [], cur = '', inQ = false;
+  const t = text.replace(/^\uFEFF/, '');
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (inQ) {
+      if (c === '"') { if (t[i+1] === '"') { cur += '"'; i++; } else inQ = false; }
+      else cur += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ',') { row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && t[i+1] === '\n') i++;
+      row.push(cur); cur = '';
+      if (row.some(v => v !== '')) records.push(row);
+      row = [];
+    } else cur += c;
   }
-  return rows;
+  row.push(cur);
+  if (row.some(v => v !== '')) records.push(row);
+  if (!records.length) return [];
+  const headers = records[0].map(h => h.trim());
+  if (updateFields && headers.length > 1) csvFields = headers;
+  return records.slice(1).map(vals => {
+    const obj = {};
+    headers.forEach((h, idx) => obj[h] = (vals[idx] || '').trim());
+    return obj;
+  });
 }
 
 function setSort(val) {
@@ -435,10 +447,24 @@ function clearSearch() {
   s.focus();
 }
 
+// Read through the GitHub API so we never get a stale CDN copy of the CSV.
+// Falls back to raw.githubusercontent.com if the API is unavailable (rate limit etc).
+async function fetchCsvText() {
+  try {
+    const hdrs = { Accept: 'application/vnd.github.raw' };
+    if (GH_TOKEN) hdrs.Authorization = `token ${GH_TOKEN}`;
+    const res = await fetch(GITHUB_API, { headers: hdrs, cache: 'no-store' });
+    if (res.ok) return await res.text();
+    if (res.status === 401 || res.status === 403) { GH_TOKEN = ''; localStorage.removeItem('gh_token'); }
+  } catch(e) { console.warn('API read failed, falling back to raw:', e); }
+  const res = await fetch(CSV_URL + '?t=' + Date.now(), { cache: 'no-store' });
+  if (!res.ok) throw new Error('raw fetch failed ' + res.status);
+  return await res.text();
+}
+
 async function loadMovies() {
   try {
-    const res = await fetch(CSV_URL + '?t=' + Date.now());
-    const text = await res.text();
+    const text = await fetchCsvText();
     movies = parseCSV(text);
     // Tonight shelf is keyed on uid now; drop any stale imdb_id entries from older versions
     tonight = new Set([...tonight].filter(id => movies.some(m => m.uid === id)));
