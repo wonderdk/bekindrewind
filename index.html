@@ -6,6 +6,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Be Kind, Rewind</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#003087">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Be Kind, Rewind">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:#0f1628;font-family:system-ui,sans-serif;color:#e8ecf8;min-height:100vh}
@@ -93,6 +99,37 @@
   .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}
   .unwatched-label{font-size:11px;}
 }
+/* ── Wishlist / Stats / Edit ── */
+.wish-actions{display:flex;gap:4px;padding:0 8px 8px}
+.wish-btn{flex:1;background:#1a2240;border:1px solid #2a3460;color:#9BA3C4;font-size:10px;font-weight:600;padding:5px 4px;border-radius:3px;cursor:pointer;letter-spacing:.03em}
+.wish-btn:hover{border-color:#556080;color:#e8ecf8}
+.wish-btn.primary{background:#FFD600;color:#003087;border-color:#FFD600}
+.wish-btn.primary:hover{background:#ffe033}
+.nav-item.wishlist.active{color:#FFD600;background:#1a2240;border-color:#FFD600}
+.stats-wrap{padding:24px;max-width:960px;margin:0 auto}
+.stats-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:28px}
+.stat-card{background:#1a2240;border:1px solid #2a3460;border-radius:4px;padding:14px}
+.stat-card-num{color:#FFD600;font-size:24px;font-weight:700;line-height:1}
+.stat-card-lbl{color:#9BA3C4;font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-top:6px}
+.stats-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:28px}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:7px;font-size:12px}
+.bar-lbl{color:#c4cadf;width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{flex:1;height:10px;background:#1a2240;border-radius:2px;overflow:hidden}
+.bar-fill{height:100%;background:#FFD600}
+.bar-num{color:#556080;width:34px;text-align:right;flex-shrink:0}
+.edit-panel{background:#1a2240;border:1px solid #2a3460;border-radius:4px;padding:16px;margin-bottom:24px;display:none}
+.edit-panel.open{display:block}
+.edit-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.edit-field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px}
+.edit-field label{color:#9BA3C4;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.edit-field input,.edit-field select{background:#0f1628;border:1px solid #2a3460;border-radius:3px;padding:7px 10px;color:#fff;font-size:13px;outline:none}
+.edit-field input:focus,.edit-field select:focus{border-color:#556080}
+.edit-actions{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.danger-btn{background:transparent;border:1px solid #8B0000;color:#ff8080;font-size:12px;padding:7px 14px;border-radius:3px;cursor:pointer}
+.danger-btn:hover{background:#2a0a0a}
+.offline-note{background:#2a2200;border-bottom:1px solid #FFD600;color:#FFD600;font-size:11px;padding:5px 16px;text-align:center;display:none}
+.modal-kind-select{background:#1a2240;border:1px solid #2a3460;color:#9BA3C4;font-size:12px;padding:0 8px;border-radius:4px;outline:none;cursor:pointer}
+@media(max-width:600px){ nav{gap:0} .nav-item{padding:5px 8px;font-size:12px} .stat{display:none} }
 /* ── Detail view ── */
 .detail-view{min-height:100vh}
 .detail-backdrop-wrap{position:relative;height:320px;overflow:hidden;background:#111827;flex-shrink:0}
@@ -197,22 +234,29 @@
   </div>
   <nav>
     <div class="nav-item active" id="nav-collection" onclick="switchView('collection')">Collection</div>
+    <div class="nav-item wishlist" id="nav-wishlist" onclick="switchView('wishlist')">Wishlist<div class="badge" id="wish-badge"></div></div>
     <div class="nav-item tonight" id="nav-tonight" onclick="switchView('tonight')">Tonight<div class="badge" id="badge"></div></div>
+    <div class="nav-item" id="nav-stats" onclick="switchView('stats')">Stats</div>
   </nav>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="stat"><strong id="total">0</strong> titles</div>
     <button class="clear-btn" id="backfill-btn" style="display:none" onclick="backfillRatings()" title="Fetch TMDB ratings for films that have none">Fetch ratings</button>
-    <button class="add-btn" onclick="openAddModal()" title="Add film to collection">+</button>
+    <button class="add-btn" onclick="openAddModal()" title="Add film">+</button>
   </div>
 </header>
+<div class="offline-note" id="offline-note">Offline: showing the last saved copy of your collection. Changes can't be saved until you're back online.</div>
 
 <div id="add-modal" class="modal-overlay" onclick="if(event.target===this)closeAddModal()">
   <div class="modal-box">
     <div class="modal-header">
-      <div class="modal-title">Add Film to Collection</div>
+      <div class="modal-title" id="add-modal-title">Add Film</div>
       <button class="modal-close" onclick="closeAddModal()">×</button>
     </div>
     <div class="modal-search-row">
+      <select id="add-kind" class="modal-kind-select" title="Movies or TV series">
+        <option value="movie">Film</option>
+        <option value="tv">TV</option>
+      </select>
       <input type="text" id="modal-query" class="modal-input" placeholder="Search by title…" onkeydown="if(event.key==='Enter')searchFilmTMDB()">
       <button class="modal-search-btn" onclick="searchFilmTMDB()">Search</button>
     </div>
@@ -221,7 +265,13 @@
       <div id="queue-chips" class="queue-chips"></div>
       <div class="modal-footer-row">
         <span class="queue-count" id="queue-count"></span>
-        <button class="modal-save-btn" id="modal-save-btn" onclick="commitAdds()">Save to collection</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="add-target" class="modal-kind-select" style="padding:7px 8px" onchange="updateSaveLabel()">
+            <option value="collection">Collection</option>
+            <option value="wishlist">Wishlist</option>
+          </select>
+          <button class="modal-save-btn" id="modal-save-btn" onclick="commitAdds()">Save to collection</button>
+        </div>
       </div>
     </div>
   </div>
@@ -259,6 +309,9 @@
       <select id="genre-select" class="toolbar-select" onchange="setGenre(this.value)">
         <option value="all">All genres</option>
       </select>
+      <select id="boxset-select" class="toolbar-select" onchange="setBoxset(this.value)">
+        <option value="all">All box sets</option>
+      </select>
      <select id="sort-select" onchange="setSort(this.value)" style="background:#0f1628;border:1px solid #2a3460;color:#9BA3C4;font-size:12px;padding:5px 10px;border-radius:3px;cursor:pointer;outline:none;">
         <option value="title-asc">Title A-Z</option>
         <option value="title-desc">Title Z-A</option>
@@ -293,6 +346,19 @@
   </div>
 </div>
 
+<div id="view-wishlist" class="hidden">
+  <div class="body">
+    <div class="shelf-label">
+      <div class="shelf-title">Wishlist</div>
+      <div class="shelf-line"></div>
+      <div class="shelf-count" id="wish-count">0 titles</div>
+    </div>
+    <div class="grid" id="wish-grid"></div>
+  </div>
+</div>
+
+<div id="view-stats" class="hidden"><div class="stats-wrap" id="stats-content"></div></div>
+
 <div id="view-detail" class="hidden"></div>
 
 <script>
@@ -303,9 +369,10 @@ let TMDB_TOKEN = localStorage.getItem('tmdb_token') || '';
 let movies = [];
 // csvFields is refreshed from the actual CSV header on load, so columns that
 // exist in the file (e.g. "hidden") are preserved on write instead of dropped.
-let csvFields = ['uid','title','year','format','barcode','imdb_id','runtime','director','watched','poster_url','box_set','genre_ids','title_da','actors','tmdb_rating'];
+let csvFields = ['uid','title','year','format','barcode','imdb_id','runtime','director','watched','poster_url','box_set','genre_ids','title_da','actors','tmdb_rating','wishlist','hidden'];
 let filter = 'all';
 let genre = 'all';
+let boxset = 'all';
 let unwatched = false;
 let tonight = new Set(JSON.parse(localStorage.getItem('tonight') || '[]'));
 let currentView = 'collection';
@@ -362,10 +429,25 @@ async function tmdbFetch(path) {
   return res.json();
 }
 
+// Row classification. Collection = not hidden and not wishlist.
+function isActive(m) { return m.hidden !== 'true' && m.wishlist !== 'true'; }
+function isWish(m) { return m.hidden !== 'true' && m.wishlist === 'true'; }
+function refreshCounts() {
+  document.getElementById('total').textContent = movies.filter(isActive).length;
+  const wb = document.getElementById('wish-badge');
+  const wc = movies.filter(isWish).length;
+  if (wb) { wb.style.display = wc ? 'flex' : 'none'; wb.textContent = wc; }
+}
+// Single write path for edits: token check, write, readable error. Returns true on success.
+async function persist(message) {
+  if (!GH_TOKEN && !(await promptToken())) return false;
+  try { await githubWrite(buildCsv(movies), message); return true; }
+  catch(e) { console.error('Write failed:', e); alert('Could not save to GitHub.\n\n' + e.message); return false; }
+}
 function fmtRating(v) { const n = parseFloat(v); return isNaN(n) || n === 0 ? '' : n.toFixed(1); }
 
 function buildCsv(list) {
-  ['title_da','actors','tmdb_rating'].forEach(f => { if (!csvFields.includes(f)) csvFields.push(f); });
+  ['title_da','actors','tmdb_rating','wishlist','hidden'].forEach(f => { if (!csvFields.includes(f)) csvFields.push(f); });
   const header = csvFields.map(f => `"${f}"`).join(',');
   const rows = list.map(m =>
     csvFields.map(f => `"${String(m[f] || '').replace(/"/g,'""')}"`).join(',')
@@ -490,17 +572,22 @@ async function fetchCsvText() {
   if (!res.ok) throw new Error('raw fetch failed ' + res.status);
   return await res.text();
 }
+function setOffline(on) { const n = document.getElementById('offline-note'); if (n) n.style.display = on ? 'block' : 'none'; }
 
 async function loadMovies() {
   try {
-    const text = await fetchCsvText();
+    let text, offline = false;
+    try { text = await fetchCsvText(); localStorage.setItem('csv_cache', text); }
+    catch(e) { text = localStorage.getItem('csv_cache'); if (!text) throw e; offline = true; }
+    setOffline(offline);
     movies = parseCSV(text);
     // Tonight shelf is keyed on uid now; drop any stale imdb_id entries from older versions
     tonight = new Set([...tonight].filter(id => movies.some(m => m.uid === id)));
     localStorage.setItem('tonight', JSON.stringify([...tonight]));
-    document.getElementById('total').textContent = movies.filter(m => m.hidden !== 'true').length;
+    refreshCounts();
     renderGrid();
     populateGenres();
+    populateBoxsets();
     updateBackfillBtn();
   } catch(e) {
     document.getElementById('grid').innerHTML = '<p style="color:#556080;padding:20px">Could not load collection.</p>';
@@ -513,9 +600,10 @@ function fmtLabel(f) { return f === 'Blu-ray' ? 'BD' : (f === '4K Ultra HD' ? '4
 function getFiltered() {
   const q = document.getElementById('search').value.toLowerCase();
   let filtered = movies.filter(m => {
+    if (!isActive(m)) return false;
     if (unwatched && m.watched === 'true') return false;
-    if (m.hidden === 'true') return false;
     if (filter !== 'all' && m.format !== filter) return false;
+    if (boxset !== 'all' && m.box_set !== boxset) return false;
     if (q && !(m.title.toLowerCase().includes(q) || m.director.toLowerCase().includes(q) || (m.title_da || '').toLowerCase().includes(q) || (m.actors || '').toLowerCase().includes(q))) return false;
     if (genre !== 'all' && !m.genre_ids?.split('|').includes(genre)) return false;
     return true;
@@ -538,12 +626,24 @@ function setGenre(val) {
   populateGenres();
 }
 
+function setBoxset(val) { boxset = val; renderGrid(); }
+function populateBoxsets() {
+  const select = document.getElementById('boxset-select');
+  if (!select) return;
+  const current = select.value;
+  const sets = new Set(movies.filter(isActive).map(m => m.box_set).filter(Boolean));
+  while (select.options.length > 1) select.remove(1);
+  [...sets].sort().forEach(b => { const o = document.createElement('option'); o.value = b; o.textContent = b; select.appendChild(o); });
+  select.value = [...sets].includes(current) ? current : 'all';
+  if (select.value === 'all') boxset = 'all';
+}
+
 function populateGenres() {
   const select = document.getElementById('genre-select');
   if (!select) return;
   const current = select.value;  // save current
   const genres = new Set();
-  movies.forEach(m => {
+  movies.filter(isActive).forEach(m => {
     if (m.genre_ids) m.genre_ids.split('|').forEach(g => {
       if (g.trim()) genres.add(g.trim());
     });
@@ -592,7 +692,7 @@ function renderTonight() {
   if (tonight.size > 0) { badge.style.display='flex'; badge.textContent=tonight.size; }
   else { badge.style.display='none'; }
   if (currentView !== 'tonight') return;
-  const picked = movies.filter(m => tonight.has(m.uid));
+  const picked = movies.filter(m => isActive(m) && tonight.has(m.uid));
   const el = document.getElementById('tonight-content');
   if (picked.length === 0) {
     el.innerHTML = '<div class="tonight-empty">Nothing on the shelf yet.<br>Star a film from the collection to add it here.</div>';
@@ -643,14 +743,112 @@ function setUnwatched(checked) {
   renderGrid();
 }
 
+const VIEWS = ['collection','wishlist','tonight','stats'];
 function switchView(v) {
   currentView = v;
   document.getElementById('view-detail').classList.add('hidden');
-  document.getElementById('view-collection').classList.toggle('hidden', v !== 'collection');
-  document.getElementById('view-tonight').classList.toggle('hidden', v !== 'tonight');
+  VIEWS.forEach(x => document.getElementById('view-' + x).classList.toggle('hidden', x !== v));
   document.getElementById('nav-collection').className = 'nav-item' + (v==='collection'?' active':'');
+  document.getElementById('nav-wishlist').className = 'nav-item wishlist' + (v==='wishlist'?' active':'');
   document.getElementById('nav-tonight').className = 'nav-item tonight' + (v==='tonight'?' active':'');
+  document.getElementById('nav-stats').className = 'nav-item' + (v==='stats'?' active':'');
+  if (v === 'wishlist') renderWishlist();
+  if (v === 'stats') renderStats();
   renderTonight();
+}
+
+function renderWishlist() {
+  const list = movies.filter(isWish).sort((a,b) => (parseInt(b.uid)||0) - (parseInt(a.uid)||0));
+  document.getElementById('wish-count').textContent = list.length + (list.length === 1 ? ' title' : ' titles');
+  const grid = document.getElementById('wish-grid');
+  if (!list.length) { grid.innerHTML = '<div class="tonight-empty" style="grid-column:1/-1">Nothing on the wishlist.<br>Use + and choose Wishlist to add films you are looking for.</div>'; return; }
+  grid.innerHTML = list.map(m => `
+    <div class="card" onclick="openDetail('${m.uid}')">
+      <div class="poster">
+        <div class="scanlines"></div>
+        ${m.poster_url ? `<img src="${escHtml(m.poster_url)}" alt="${escHtml(m.title)}" onerror="this.style.display='none'">` : ''}
+        <div class="fmt-badge ${fmtClass(m.format)}">${fmtLabel(m.format)}</div>
+      </div>
+      <div class="card-info">
+        <div class="card-meta">
+          <div class="card-title">${escHtml(m.title)}</div>
+          <div class="card-year">${escHtml(m.year)}${fmtRating(m.tmdb_rating) ? ` · <span style="color:#FFD600">${fmtRating(m.tmdb_rating)}</span>` : ''}</div>
+        </div>
+      </div>
+      <div class="wish-actions">
+        <button class="wish-btn primary" onclick="event.stopPropagation();moveToCollection('${m.uid}')">Got it</button>
+        <button class="wish-btn" onclick="event.stopPropagation();removeFromWishlist('${m.uid}')">Remove</button>
+      </div>
+    </div>`).join('');
+}
+
+// Wishlist row becomes a collection row in place (keeps uid, format, metadata).
+async function moveToCollection(uid) {
+  const m = movies.find(m => m.uid === uid);
+  if (!m || !isWish(m)) return;
+  if (movies.some(x => isActive(x) && x.imdb_id === m.imdb_id && x.format === m.format)) {
+    if (!confirm(`"${m.title}" is already in the collection on ${m.format}. Remove it from the wishlist instead?`)) return;
+    return removeFromWishlist(uid, true);
+  }
+  m.wishlist = ''; m.watched = 'false';
+  if (await persist(`Wishlist → collection: ${m.title} (${m.format})`)) {
+    afterDataChange(); showAddToast(`"${m.title}" moved to collection`);
+  } else { m.wishlist = 'true'; }
+}
+async function removeFromWishlist(uid, skipConfirm) {
+  const m = movies.find(m => m.uid === uid);
+  if (!m) return;
+  if (!skipConfirm && !confirm(`Remove "${m.title}" (${m.format}) from the wishlist?`)) return;
+  m.hidden = 'true';
+  if (await persist(`Remove from wishlist: ${m.title}`)) { afterDataChange(); showAddToast('Removed from wishlist'); }
+  else { m.hidden = ''; }
+}
+function afterDataChange() {
+  refreshCounts(); renderGrid(); populateGenres(); populateBoxsets(); updateBackfillBtn();
+  if (currentView === 'wishlist') renderWishlist();
+  if (currentView === 'stats') renderStats();
+  renderTonight();
+}
+
+function renderStats() {
+  const el = document.getElementById('stats-content');
+  const list = movies.filter(isActive);
+  if (!list.length) { el.innerHTML = '<div class="tonight-empty">No films yet.</div>'; return; }
+  const n = list.length;
+  const watched = list.filter(m => m.watched === 'true').length;
+  const runtime = list.reduce((a,m) => a + (parseInt(m.runtime) || 0), 0);
+  const uniq = new Set(list.map(m => m.imdb_id).filter(Boolean)).size;
+  const rated = list.filter(m => fmtRating(m.tmdb_rating));
+  const avg = rated.length ? (rated.reduce((a,m) => a + parseFloat(m.tmdb_rating), 0) / rated.length).toFixed(1) : '–';
+  const count = (arr) => { const c = {}; arr.forEach(k => { if (k) c[k] = (c[k]||0)+1; }); return Object.entries(c).sort((a,b) => b[1]-a[1]); };
+  const formats = count(list.map(m => m.format));
+  const decades = count(list.map(m => { const y = parseInt(m.year); return y ? `${Math.floor(y/10)*10}s` : ''; })).sort((a,b) => a[0].localeCompare(b[0]));
+  const directors = count(list.map(m => m.director)).filter(([d]) => d && d !== '-').slice(0, 10);
+  const genres = count(list.flatMap(m => (m.genre_ids||'').split('|').map(g => g.trim()))).slice(0, 10);
+  const boxsets = count(list.map(m => m.box_set)).slice(0, 10);
+  const bars = (title, rows) => rows.length ? `<div class="detail-section"><div class="detail-section-title">${title}</div>${rows.map(([k,v]) => `<div class="bar-row"><div class="bar-lbl" title="${escHtml(k)}">${escHtml(k)}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/rows[0][1]*100)}%"></div></div><div class="bar-num">${v}</div></div>`).join('')}</div>` : '';
+  const maxDec = Math.max(...decades.map(d => d[1]), 1);
+  el.innerHTML = `
+    <div class="stats-cards">
+      <div class="stat-card"><div class="stat-card-num">${n}</div><div class="stat-card-lbl">Discs</div></div>
+      <div class="stat-card"><div class="stat-card-num">${uniq}</div><div class="stat-card-lbl">Unique titles</div></div>
+      <div class="stat-card"><div class="stat-card-num">${Math.round(watched/n*100)}%</div><div class="stat-card-lbl">Watched (${watched}/${n})</div></div>
+      <div class="stat-card"><div class="stat-card-num">${n - watched}</div><div class="stat-card-lbl">Unwatched</div></div>
+      <div class="stat-card"><div class="stat-card-num">${Math.round(runtime/60)}h</div><div class="stat-card-lbl">Total runtime</div></div>
+      <div class="stat-card"><div class="stat-card-num">${avg}</div><div class="stat-card-lbl">Avg TMDB rating</div></div>
+      <div class="stat-card"><div class="stat-card-num">${movies.filter(isWish).length}</div><div class="stat-card-lbl">On wishlist</div></div>
+    </div>
+    <div class="stats-cols">
+      <div>
+        ${bars('Formats', formats)}
+        <div class="detail-section"><div class="detail-section-title">Decades</div>${decades.map(([k,v]) => `<div class="bar-row"><div class="bar-lbl">${k}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/maxDec*100)}%"></div></div><div class="bar-num">${v}</div></div>`).join('')}</div>
+        ${bars('Box sets', boxsets)}
+      </div>
+      <div>
+        ${bars('Top directors', directors)}
+        ${bars('Top genres', genres)}
+      </div>
+    </div>`;
 }
 
 function escHtml(s) {
@@ -661,8 +859,7 @@ async function openDetail(uid) {
   const m = movies.find(m => m.uid === uid);
   if (!m) return;
   const imdbId = m.imdb_id;
-  document.getElementById('view-collection').classList.add('hidden');
-  document.getElementById('view-tonight').classList.add('hidden');
+  VIEWS.forEach(x => document.getElementById('view-' + x).classList.add('hidden'));
   const el = document.getElementById('view-detail');
   el.classList.remove('hidden');
   el.innerHTML = '<div class="detail-view"><div class="detail-backdrop-wrap"><div class="detail-backdrop"></div><button class="back-btn" onclick="closeDetail()">← Back</button></div><div class="detail-content" style="color:#9BA3C4;padding-top:40px;text-align:center">Loading...</div></div>';
@@ -713,10 +910,39 @@ async function openDetail(uid) {
               ${score !== null ? `<div class="detail-score"><span class="detail-score-pct">${score}%</span><span class="detail-score-lbl">TMDB<br>Score</span></div>` : ''}
               ${d.tagline ? `<div class="detail-tagline">${escHtml(d.tagline)}</div>` : ''}
               <div class="detail-actions">
+                ${isWish(m) ? `
+                <button class="trailer-btn" onclick="moveToCollection('${m.uid}').then(()=>closeDetail())">Got it → Collection</button>
+                <button class="detail-watched-btn" onclick="removeFromWishlist('${m.uid}').then(()=>{ if(!movies.find(x=>x.uid==='${m.uid}'&&isWish(x))) closeDetail(); })">Remove from wishlist</button>
+                ` : `
                 <button class="detail-watched-btn${isWatched ? ' is-watched' : ''}" id="detail-watched-btn" onclick="detailToggleWatched('${m.uid}')">
                   ${isWatched ? '✓ Watched' : 'Mark as Watched'}
-                </button>
+                </button>`}
                 ${trailer ? `<a class="trailer-btn" href="https://www.youtube.com/watch?v=${trailer.key}" target="_blank" rel="noopener">▶ Trailer</a>` : ''}
+                <button class="detail-watched-btn" onclick="toggleEditPanel()">Edit</button>
+              </div>
+            </div>
+          </div>
+          <div class="edit-panel" id="edit-panel">
+            <div class="edit-row">
+              <div class="edit-field"><label>Format</label>
+                <select id="edit-format">${['DVD','Blu-ray','4K Ultra HD','VHS'].map(f => `<option value="${f}"${m.format === f ? ' selected' : ''}>${f}</option>`).join('')}</select>
+              </div>
+              <div class="edit-field"><label>Box set</label>
+                <input id="edit-boxset" list="boxset-list" value="${escHtml(m.box_set || '')}" placeholder="None">
+                <datalist id="boxset-list">${[...new Set(movies.map(x => x.box_set).filter(Boolean))].sort().map(b => `<option value="${escHtml(b)}">`).join('')}</datalist>
+              </div>
+              <div class="edit-field"><label>Barcode</label>
+                <input id="edit-barcode" value="${escHtml(m.barcode || '')}" placeholder="EAN / UPC" inputmode="numeric">
+              </div>
+              <div class="edit-field"><label>Year</label>
+                <input id="edit-year" value="${escHtml(m.year || '')}" inputmode="numeric" style="max-width:100px">
+              </div>
+            </div>
+            <div class="edit-actions">
+              <button class="danger-btn" onclick="deleteFilm('${m.uid}')">Delete from ${isWish(m) ? 'wishlist' : 'collection'}</button>
+              <div style="display:flex;gap:8px">
+                <button class="detail-watched-btn" onclick="toggleEditPanel()">Cancel</button>
+                <button class="trailer-btn" onclick="saveEdit('${m.uid}')">Save changes</button>
               </div>
             </div>
           </div>
@@ -732,13 +958,40 @@ async function openDetail(uid) {
 }
 
 function closeDetail() {
-  document.getElementById('view-detail').classList.add('hidden');
-  if (currentView === 'collection') {
-    document.getElementById('view-collection').classList.remove('hidden');
-  } else {
-    document.getElementById('view-tonight').classList.remove('hidden');
-  }
+  switchView(currentView);
   window.scrollTo(0, 0);
+}
+
+function toggleEditPanel() { const p = document.getElementById('edit-panel'); if (p) p.classList.toggle('open'); }
+
+async function saveEdit(uid) {
+  const m = movies.find(m => m.uid === uid);
+  if (!m) return;
+  const next = {
+    format: document.getElementById('edit-format').value,
+    box_set: document.getElementById('edit-boxset').value.trim(),
+    barcode: document.getElementById('edit-barcode').value.trim(),
+    year: document.getElementById('edit-year').value.trim()
+  };
+  if (next.format !== m.format && movies.some(x => x.uid !== uid && x.hidden !== 'true' && x.wishlist === m.wishlist && x.imdb_id === m.imdb_id && x.format === next.format)) {
+    alert(`"${m.title}" already exists on ${next.format}.`); return;
+  }
+  const prev = { format: m.format, box_set: m.box_set, barcode: m.barcode, year: m.year };
+  if (Object.keys(next).every(k => (next[k] || '') === (prev[k] || ''))) { toggleEditPanel(); return; }
+  Object.assign(m, next);
+  if (await persist(`Edit: ${m.title}`)) { afterDataChange(); openDetail(uid); showAddToast('Changes saved'); }
+  else { Object.assign(m, prev); }
+}
+
+// Soft delete: row stays in the CSV with hidden=true, so history and the write guard both hold.
+async function deleteFilm(uid) {
+  const m = movies.find(m => m.uid === uid);
+  if (!m) return;
+  if (!confirm(`Delete "${m.title}" (${m.format})? It is hidden, not removed from the CSV, so it can be restored by hand.`)) return;
+  m.hidden = 'true';
+  tonight.delete(uid); localStorage.setItem('tonight', JSON.stringify([...tonight]));
+  if (await persist(`Delete: ${m.title} (${m.format})`)) { afterDataChange(); closeDetail(); showAddToast(`"${m.title}" deleted`); }
+  else { m.hidden = ''; }
 }
 
 async function detailToggleWatched(uid) {
@@ -752,9 +1005,16 @@ async function detailToggleWatched(uid) {
   btn.classList.toggle('is-watched', isWatched);
 }
 
+function updateSaveLabel() {
+  const t = document.getElementById('add-target').value;
+  document.getElementById('modal-save-btn').textContent = t === 'wishlist' ? 'Save to wishlist' : 'Save to collection';
+  document.getElementById('add-modal-title').textContent = t === 'wishlist' ? 'Add to Wishlist' : 'Add to Collection';
+}
 function openAddModal() {
   const m = document.getElementById('add-modal');
   m.style.display = 'flex';
+  document.getElementById('add-target').value = currentView === 'wishlist' ? 'wishlist' : 'collection';
+  updateSaveLabel();
   document.getElementById('modal-results').innerHTML = '';
   document.getElementById('modal-query').value = '';
   renderQueue();
@@ -770,34 +1030,40 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAddMo
 async function searchFilmTMDB() {
   const q = document.getElementById('modal-query').value.trim();
   if (!q) return;
+  const kind = document.getElementById('add-kind').value;
   const el = document.getElementById('modal-results');
   el.innerHTML = '<div class="modal-status">Searching…</div>';
   try {
-    const data = await tmdbFetch(`/search/movie?query=${encodeURIComponent(q)}&language=en-US&page=1`);
+    const data = await tmdbFetch(`/search/${kind}?query=${encodeURIComponent(q)}&language=en-US&page=1`);
     const results = (data.results || []).slice(0, 10);
     if (!results.length) { el.innerHTML = '<div class="modal-status">No results found.</div>'; return; }
-    el.innerHTML = results.map(r => `
-      <div class="modal-result" id="mr-${r.id}">
-        ${r.poster_path ? `<img class="modal-result-poster" src="https://image.tmdb.org/t/p/w92${r.poster_path}" alt="${escHtml(r.title)}">` : '<div class="modal-poster-empty"></div>'}
+    el.innerHTML = results.map(r => {
+      const key = `${kind}-${r.id}`;
+      const title = r.title || r.name || '';
+      const year = (r.release_date || r.first_air_date || '').slice(0,4) || '—';
+      return `
+      <div class="modal-result" id="mr-${key}">
+        ${r.poster_path ? `<img class="modal-result-poster" src="https://image.tmdb.org/t/p/w92${r.poster_path}" alt="${escHtml(title)}">` : '<div class="modal-poster-empty"></div>'}
         <div class="modal-result-info">
-          <div class="modal-result-title">${escHtml(r.title)}</div>
-          <div class="modal-result-meta">${r.release_date?.slice(0,4) || '—'} · <span id="dir-${r.id}">…</span></div>
+          <div class="modal-result-title">${escHtml(title)}</div>
+          <div class="modal-result-meta">${year} · <span id="dir-${key}">${kind === 'tv' ? 'TV series' : '…'}</span></div>
         </div>
-        <select class="modal-fmt-select" id="fmt-${r.id}">
+        <select class="modal-fmt-select" id="fmt-${key}">
           <option value="DVD" selected>DVD</option>
           <option value="Blu-ray">Blu-ray</option>
           <option value="4K Ultra HD">4K Ultra HD</option>
           <option value="VHS">VHS</option>
         </select>
-        <button class="modal-add-btn" onclick="queueFilm(${r.id})">${pendingAdds.some(p => p.tmdbId === r.id) ? 'Added ✓' : 'Add'}</button>
-      </div>`).join('');
-    results.forEach(async r => {
+        <button class="modal-add-btn" onclick="queueFilm('${kind}', ${r.id})">${pendingAdds.some(p => p.key === key) ? 'Added ✓' : 'Add'}</button>
+      </div>`;
+    }).join('');
+    if (kind === 'movie') results.forEach(async r => {
       try {
         const credits = await tmdbFetch(`/movie/${r.id}/credits`);
         const dir = credits.crew?.find(c => c.job === 'Director')?.name || '—';
-        const d = document.getElementById(`dir-${r.id}`);
+        const d = document.getElementById(`dir-movie-${r.id}`);
         if (d) d.textContent = dir;
-      } catch { const d = document.getElementById(`dir-${r.id}`); if (d) d.textContent = '—'; }
+      } catch { const d = document.getElementById(`dir-movie-${r.id}`); if (d) d.textContent = '—'; }
     });
   } catch(e) {
     el.innerHTML = '<div class="modal-status">Search failed. Please try again.</div>';
@@ -805,49 +1071,55 @@ async function searchFilmTMDB() {
 }
 
 // Queue a film locally (fetches TMDB details now, writes to GitHub only on Save)
-async function queueFilm(tmdbId) {
-  if (pendingAdds.some(p => p.tmdbId === tmdbId)) { unqueueFilm(tmdbId); return; }
-  const btn = document.querySelector(`#mr-${tmdbId} .modal-add-btn`);
-  const fmt = document.getElementById(`fmt-${tmdbId}`)?.value || 'DVD';
+async function queueFilm(kind, tmdbId) {
+  const key = `${kind}-${tmdbId}`;
+  if (pendingAdds.some(p => p.key === key)) { unqueueFilm(key); return; }
+  const btn = document.querySelector(`#mr-${key} .modal-add-btn`);
+  const fmt = document.getElementById(`fmt-${key}`)?.value || 'DVD';
+  const target = document.getElementById('add-target').value;
   if (btn) { btn.textContent = '…'; btn.disabled = true; }
   try {
-    const d = await tmdbFetch(`/movie/${tmdbId}?append_to_response=credits,external_ids,translations`);
+    const d = await tmdbFetch(`/${kind}/${tmdbId}?append_to_response=credits,external_ids,translations`);
     const imdbId = d.external_ids?.imdb_id || '';
-    if (imdbId && movies.some(m => m.imdb_id === imdbId && m.format === fmt)) {
-      alert(`"${d.title}" is already in the collection on ${fmt}.`);
-      if (btn) { btn.textContent = 'Add'; btn.disabled = false; }
-      return;
+    const title = d.title || d.name || '';
+    if (imdbId) {
+      const inColl = movies.some(m => isActive(m) && m.imdb_id === imdbId && m.format === fmt);
+      const inWish = movies.some(m => isWish(m) && m.imdb_id === imdbId && m.format === fmt);
+      if (inColl) { alert(`"${title}" is already in the collection on ${fmt}.`); if (btn) { btn.textContent = 'Add'; btn.disabled = false; } return; }
+      if (target === 'wishlist' && inWish) { alert(`"${title}" is already on the wishlist on ${fmt}.`); if (btn) { btn.textContent = 'Add'; btn.disabled = false; } return; }
     }
     const daTitle = d.translations?.translations?.find(t => t.iso_639_1 === 'da')?.data?.title || '';
     pendingAdds.push({
-      tmdbId,
-      title: d.title || '',
-      year: d.release_date?.slice(0, 4) || '',
+      key,
+      title,
+      year: (d.release_date || d.first_air_date || '').slice(0, 4),
       format: fmt,
       barcode: '',
       imdb_id: imdbId,
-      runtime: String(d.runtime || ''),
-      director: d.credits?.crew?.find(c => c.job === 'Director')?.name || '',
+      runtime: String(kind === 'tv' ? (d.episode_run_time?.[0] || '') : (d.runtime || '')),
+      director: kind === 'tv' ? (d.created_by?.[0]?.name || '') : (d.credits?.crew?.find(c => c.job === 'Director')?.name || ''),
       watched: 'false',
       poster_url: d.poster_path ? `https://image.tmdb.org/t/p/w300${d.poster_path}` : '',
       box_set: '',
       genre_ids: (d.genres || []).map(g => g.name).join('|'),
       tmdb_rating: fmtRating(d.vote_average),
       title_da: daTitle,
-      actors: (d.credits?.cast || []).slice(0, 5).map(c => c.name).join('|') || '-'
+      actors: (d.credits?.cast || []).slice(0, 5).map(c => c.name).join('|') || '-',
+      wishlist: target === 'wishlist' ? 'true' : '',
+      hidden: ''
     });
     if (btn) { btn.textContent = 'Added ✓'; btn.disabled = false; }
     renderQueue();
   } catch(e) {
     console.error('Queue film failed:', e);
     if (btn) { btn.textContent = 'Add'; btn.disabled = false; }
-    alert('Could not fetch film details.\n\n' + e.message);
+    alert('Could not fetch details.\n\n' + e.message);
   }
 }
 
-function unqueueFilm(tmdbId) {
-  pendingAdds = pendingAdds.filter(p => p.tmdbId !== tmdbId);
-  const btn = document.querySelector(`#mr-${tmdbId} .modal-add-btn`);
+function unqueueFilm(key) {
+  pendingAdds = pendingAdds.filter(p => p.key !== key);
+  const btn = document.querySelector(`#mr-${key} .modal-add-btn`);
   if (btn) { btn.textContent = 'Add'; btn.disabled = false; }
   renderQueue();
 }
@@ -863,7 +1135,7 @@ function renderQueue() {
   chips.innerHTML = pendingAdds.map(p => `
     <span class="queue-chip">
       ${escHtml(p.title)} <span class="queue-chip-fmt">${escHtml(fmtLabel(p.format))}</span>
-      <button class="queue-chip-x" onclick="unqueueFilm(${p.tmdbId})" title="Remove">×</button>
+      <button class="queue-chip-x" onclick="unqueueFilm('${p.key}')" title="Remove">×</button>
     </span>`).join('');
 }
 
@@ -875,25 +1147,44 @@ async function commitAdds() {
   saveBtn.disabled = true;
   saveBtn.textContent = 'Saving…';
   try {
+    const target = document.getElementById('add-target').value;
     let nextUid = movies.reduce((max, m) => Math.max(max, parseInt(m.uid) || 0), 0);
-    const newMovies = pendingAdds.map(p => {
-      const { tmdbId, ...rest } = p;
-      return { uid: String(++nextUid), ...rest };
+    const newMovies = [];
+    let moved = 0;
+    const touched = [];   // wishlist rows converted in place, with their previous state for rollback
+    pendingAdds.forEach(p => {
+      const { key, ...rest } = p;
+      // Adding to the collection something that is on the wishlist in the same format:
+      // convert that wishlist row instead of creating a second one.
+      const w = target === 'collection' && rest.imdb_id
+        ? movies.find(m => isWish(m) && m.imdb_id === rest.imdb_id && m.format === rest.format) : null;
+      if (w) {
+        touched.push({ row: w, prev: { ...w } });
+        Object.assign(w, rest, { uid: w.uid, wishlist: '', watched: 'false' });
+        moved++;
+      } else {
+        newMovies.push({ uid: String(++nextUid), ...rest });
+      }
     });
-    const message = newMovies.length === 1
-      ? `Add: ${newMovies[0].title}`
-      : `Add ${newMovies.length} films`;
-    await githubWrite(buildCsv([...movies, ...newMovies]), message);
+    const where = target === 'wishlist' ? 'wishlist' : 'collection';
+    const total = newMovies.length + moved;
+    const message = total === 1
+      ? `Add to ${where}: ${pendingAdds[0].title}${moved ? ' (from wishlist)' : ''}`
+      : `Add ${total} titles to ${where}${moved ? ` (${moved} from wishlist)` : ''}`;
+    try {
+      await githubWrite(buildCsv([...movies, ...newMovies]), message);
+    } catch(e) {
+      touched.forEach(t => Object.assign(t.row, t.prev));
+      throw e;
+    }
     movies.push(...newMovies);
-    document.getElementById('total').textContent = movies.filter(m => m.hidden !== 'true').length;
-    renderGrid();
-    populateGenres();
+    afterDataChange();
     pendingAdds = [];
     renderQueue();
     closeAddModal();
-    showAddToast(newMovies.length === 1
-      ? `"${newMovies[0].title}" added to collection`
-      : `${newMovies.length} films added to collection`);
+    showAddToast(total === 1
+      ? `"${newMovies[0]?.title || touched[0].row.title}" added to ${where}${moved ? ' (moved from wishlist)' : ''}`
+      : `${total} titles added to ${where}${moved ? `, ${moved} moved from wishlist` : ''}`);
   } catch(e) {
     console.error('Save failed:', e);
     alert('Could not save to GitHub. Your queued films are still in the list.\n\n' + e.message);
@@ -906,7 +1197,7 @@ async function commitAdds() {
 function updateBackfillBtn() {
   const btn = document.getElementById('backfill-btn');
   if (!btn) return;
-  const missing = movies.filter(m => m.imdb_id && !fmtRating(m.tmdb_rating)).length;
+  const missing = movies.filter(m => m.hidden !== 'true' && m.imdb_id && !fmtRating(m.tmdb_rating)).length;
   btn.style.display = missing ? 'inline-block' : 'none';
   btn.textContent = `Fetch ratings (${missing})`;
 }
@@ -915,7 +1206,7 @@ function updateBackfillBtn() {
 // then write the CSV back as a single commit.
 async function backfillRatings() {
   const btn = document.getElementById('backfill-btn');
-  const todo = movies.filter(m => m.imdb_id && !fmtRating(m.tmdb_rating));
+  const todo = movies.filter(m => m.hidden !== 'true' && m.imdb_id && !fmtRating(m.tmdb_rating));
   if (!todo.length) return;
   if (!GH_TOKEN && !(await promptToken())) return;
   if (!TMDB_TOKEN && !(await promptToken('tmdb'))) return;
@@ -961,6 +1252,9 @@ function showAddToast(msg) {
 }
 
 loadMovies();
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW registration failed:', e));
+}
 </script>
 </body>
 </html>
