@@ -319,10 +319,10 @@ html,body{overflow-x:hidden;max-width:100%}
         <option value="VHS">VHS</option>
       </select>
       <select id="genre-select" class="toolbar-select" onchange="setGenre(this.value)">
-        <option value="all">All shelves</option>
+        <option value="all">All genres</option>
       </select>
-      <select id="boxset-select" class="toolbar-select" onchange="setBoxset(this.value)">
-        <option value="all">All box sets</option>
+      <select id="shelf-select" class="toolbar-select" onchange="setShelf(this.value)">
+        <option value="all">All shelves</option>
       </select>
       <select id="sort-select" class="toolbar-select" onchange="setSort(this.value)">
         <option value="title-asc">Title A-Z</option>
@@ -384,7 +384,7 @@ let movies = [];
 let csvFields = ['uid','title','year','format','barcode','imdb_id','runtime','director','watched','poster_url','box_set','genre_ids','title_da','actors','tmdb_rating','wishlist','hidden','primary_genre'];
 let filter = 'all';
 let genre = 'all';
-let boxset = 'all';
+let shelf = 'all';
 let unwatched = false;
 let tonight = new Set(JSON.parse(localStorage.getItem('tonight') || '[]'));
 let currentView = 'collection';
@@ -616,7 +616,7 @@ async function loadMovies() {
     refreshCounts();
     renderGrid();
     populateGenres();
-    populateBoxsets();
+    populateShelves();
   } catch(e) {
     document.getElementById('grid').innerHTML = '<p style="color:#556080;padding:20px">Could not load collection.</p>';
   }
@@ -631,9 +631,9 @@ function getFiltered() {
     if (!isActive(m)) return false;
     if (unwatched && m.watched === 'true') return false;
     if (filter !== 'all' && m.format !== filter) return false;
-    if (boxset !== 'all' && m.box_set !== boxset) return false;
     if (q && !(m.title.toLowerCase().includes(q) || m.director.toLowerCase().includes(q) || (m.title_da || '').toLowerCase().includes(q) || (m.actors || '').toLowerCase().includes(q))) return false;
-    if (genre !== 'all' && (m.primary_genre || '') !== genre) return false;
+    if (genre !== 'all' && !m.genre_ids?.split('|').includes(genre)) return false;
+    if (shelf !== 'all' && (m.primary_genre || '') !== shelf) return false;
     return true;
   });
   filtered.sort((a,b) => {
@@ -654,26 +654,30 @@ function setGenre(val) {
   populateGenres();
 }
 
-function setBoxset(val) { boxset = val; renderGrid(); }
-function populateBoxsets() {
-  const select = document.getElementById('boxset-select');
+function setShelf(val) { shelf = val; renderGrid(); }
+function populateShelves() {
+  const select = document.getElementById('shelf-select');
   if (!select) return;
   const current = select.value;
-  const sets = new Set(movies.filter(isActive).map(m => m.box_set).filter(Boolean));
+  const vals = new Set(movies.filter(isActive).map(m => m.primary_genre).filter(Boolean));
   while (select.options.length > 1) select.remove(1);
-  [...sets].sort().forEach(b => { const o = document.createElement('option'); o.value = b; o.textContent = b; select.appendChild(o); });
-  select.value = [...sets].includes(current) ? current : 'all';
-  if (select.value === 'all') boxset = 'all';
+  [...vals].sort((a,b) => (SHELVES.indexOf(a) + 1 || 99) - (SHELVES.indexOf(b) + 1 || 99) || a.localeCompare(b))
+    .forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; select.appendChild(o); });
+  select.value = vals.has(current) ? current : 'all';
+  if (select.value === 'all') shelf = 'all';
 }
 
 function populateGenres() {
   const select = document.getElementById('genre-select');
   if (!select) return;
   const current = select.value;  // save current
-  const genres = new Set(movies.filter(isActive).map(m => m.primary_genre).filter(Boolean));
+  const genres = new Set();
+  movies.filter(isActive).forEach(m => {
+    if (m.genre_ids) m.genre_ids.split('|').forEach(g => { if (g.trim()) genres.add(g.trim()); });
+  });
   if (genres.size === 0) return;
   while (select.options.length > 1) select.remove(1);
-  [...genres].sort((a,b) => (SHELVES.indexOf(a) + 1 || 99) - (SHELVES.indexOf(b) + 1 || 99) || a.localeCompare(b)).forEach(g => {
+  [...genres].sort().forEach(g => {
     const opt = document.createElement('option');
     opt.value = g;
     opt.textContent = g;
@@ -827,7 +831,7 @@ async function removeFromWishlist(uid, skipConfirm) {
   else { m.hidden = ''; }
 }
 function afterDataChange() {
-  refreshCounts(); renderGrid(); populateGenres(); populateBoxsets();
+  refreshCounts(); renderGrid(); populateGenres(); populateShelves();
   if (currentView === 'wishlist') renderWishlist();
   if (currentView === 'stats') renderStats();
   renderTonight();
@@ -848,6 +852,7 @@ function renderStats() {
   const decades = count(list.map(m => { const y = parseInt(m.year); return y ? `${Math.floor(y/10)*10}s` : ''; })).sort((a,b) => a[0].localeCompare(b[0]));
   const directors = count(list.map(m => m.director)).filter(([d]) => d && d !== '-').slice(0, 10);
   const shelves = count(list.map(m => m.primary_genre || 'Unassigned'));
+  const genres = count(list.flatMap(m => (m.genre_ids||'').split('|').map(g => g.trim()))).slice(0, 10);
   const boxsets = count(list.map(m => m.box_set)).slice(0, 10);
   const bars = (title, rows) => rows.length ? `<div class="detail-section"><div class="detail-section-title">${title}</div>${rows.map(([k,v]) => `<div class="bar-row"><div class="bar-lbl" title="${escHtml(k)}">${escHtml(k)}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/rows[0][1]*100)}%"></div></div><div class="bar-num">${v}</div></div>`).join('')}</div>` : '';
   const maxDec = Math.max(...decades.map(d => d[1]), 1);
@@ -870,6 +875,7 @@ function renderStats() {
       <div>
         ${bars('Top directors', directors)}
         ${bars('Shelves', shelves)}
+        ${bars('Top genres', genres)}
       </div>
     </div>`;
 }
