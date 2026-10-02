@@ -774,6 +774,10 @@ function updateHover() {
 const overlay = document.getElementById('pull-overlay');
 const inner = document.getElementById('pull-inner');
 async function fetchDetails(m) {
+  // cached in the sheet? no network needed at all
+  if (m.overview || m.tmdb_rating) {
+    return { ov: m.overview || '', score: m.tmdb_rating ? Math.round(parseFloat(m.tmdb_rating) * 10) : null };
+  }
   if (overviewCache.has(m.uid)) return overviewCache.get(m.uid);
   const none = { ov: '', score: null };
   if (!/^tt\d{7,8}$/.test(m.imdb_id) || m.imdb_id === 'tt0000000') return none;
