@@ -253,6 +253,7 @@ html,body{overflow-x:hidden;max-width:100%}
   </nav>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="stat"><strong id="total">0</strong> titles</div>
+    <button class="add-btn" id="cache-btn" style="display:none;font-size:13px" onclick="cacheAllTmdb()" title="Download TMDB info for all films into the sheet">⭳</button>
     <button class="add-btn" onclick="openAddModal()" title="Add film">+</button>
   </div>
 </header>
@@ -377,16 +378,18 @@ html,body{overflow-x:hidden;max-width:100%}
 const CSV_URL = 'https://raw.githubusercontent.com/wonderdk/bekindrewind/main/movies.csv';
 const GITHUB_API = 'https://api.github.com/repos/wonderdk/bekindrewind/contents/movies.csv';
 let GH_TOKEN = localStorage.getItem('gh_token') || '';
-let TMDB_TOKEN = localStorage.getItem('tmdb_token') || '';
+const DEFAULT_TMDB_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIxZTY3N2ZiMTVjMGM4ZDBkNTMzNjQzMGYxNmNlOTFmMiIsIm5iZiI6MTc3NjQxMjk3Mi4zMDIsInN1YiI6IjY5ZTFlOTJjNmJlM2VmOWRmZThiN2I1MCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.LmxBN4pTZr1OsghaHWA2LkbrqJrGNqftKmyQ1ZUNOQA';
+let TMDB_TOKEN = localStorage.getItem('tmdb_token') || DEFAULT_TMDB_TOKEN;
 let movies = [];
 // csvFields is refreshed from the actual CSV header on load, so columns that
 // exist in the file (e.g. "hidden") are preserved on write instead of dropped.
-let csvFields = ['uid','title','year','format','barcode','imdb_id','runtime','director','watched','poster_url','box_set','genre_ids','title_da','actors','tmdb_rating','wishlist','hidden','primary_genre'];
+let csvFields = ['uid','title','year','format','barcode','imdb_id','runtime','director','watched','poster_url','box_set','genre_ids','title_da','actors','tmdb_rating','overview','wishlist','hidden','primary_genre'];
 let filter = 'all';
 let genre = 'all';
 let shelf = 'all';
 let unwatched = false;
-let tonight = new Set(JSON.parse(localStorage.getItem('tonight') || '[]'));
+let tonight = new Set();
+try { tonight = new Set(JSON.parse(localStorage.getItem('tonight') || '[]')); } catch(e) { localStorage.removeItem('tonight'); }
 let currentView = 'collection';
 let sort = 'title-asc';
 let pendingAdds = [];
@@ -434,8 +437,13 @@ async function tmdbFetch(path) {
   if (!TMDB_TOKEN && !(await promptToken('tmdb'))) throw new Error('No TMDB token');
   const res = await fetch('https://api.themoviedb.org/3' + path, { headers: { Authorization: `Bearer ${TMDB_TOKEN}` } });
   if (res.status === 401) {
-    TMDB_TOKEN = ''; localStorage.removeItem('tmdb_token');
-    throw new Error('TMDB rejected the token. It has been cleared; you will be asked again.');
+    localStorage.removeItem('tmdb_token');
+    if (TMDB_TOKEN !== DEFAULT_TMDB_TOKEN) {
+      TMDB_TOKEN = DEFAULT_TMDB_TOKEN;
+      throw new Error('Your personal TMDB token was rejected and has been cleared. The built-in token will be used from now on; just retry.');
+    }
+    TMDB_TOKEN = '';
+    throw new Error('TMDB rejected the built-in token. Paste a fresh one when asked.');
   }
   if (!res.ok) throw new Error(`TMDB error ${res.status}`);
   return res.json();
@@ -444,8 +452,42 @@ async function tmdbFetch(path) {
 // Row classification. Collection = not hidden and not wishlist.
 function isActive(m) { return m.hidden !== 'true' && m.wishlist !== 'true'; }
 function isWish(m) { return m.hidden !== 'true' && m.wishlist === 'true'; }
+function cacheMissing() {
+  return movies.filter(m => m.hidden !== 'true' && /^tt\d{7,8}$/.test(m.imdb_id) && (!m.overview || !m.tmdb_rating));
+}
+async function cacheAllTmdb() {
+  const btn = document.getElementById('cache-btn');
+  const todo = cacheMissing();
+  if (!todo.length) return;
+  if (!confirm(`Download TMDB info (overview, rating) for ${todo.length} titles and save it into the sheet?\n\nAfter this, film details work for everyone without a TMDB key.`)) return;
+  if (!GH_TOKEN && !(await promptToken())) return;
+  btn.disabled = true;
+  let done = 0, failed = 0;
+  for (const m of todo) {
+    btn.textContent = `${done}/${todo.length}`;
+    try {
+      const f = await tmdbFetch(`/find/${m.imdb_id}?external_source=imdb_id`);
+      let id = f.movie_results?.[0]?.id, kind = 'movie';
+      if (!id) { id = f.tv_results?.[0]?.id; kind = 'tv'; }
+      if (!id) { failed++; continue; }
+      const d = await tmdbFetch(`/${kind}/${id}`);
+      if (!m.overview) m.overview = d.overview || '';
+      if (!m.tmdb_rating) m.tmdb_rating = fmtRating(d.vote_average);
+      done++;
+    } catch(e) { failed++; }
+    await new Promise(r => setTimeout(r, 120)); // stay friendly to TMDB
+  }
+  btn.textContent = 'Saving…';
+  const ok = await persist(`Cache TMDB data for ${done} titles`);
+  btn.disabled = false;
+  btn.textContent = '⭳';
+  refreshCounts();
+  if (ok) showAddToast(`Cached TMDB info for ${done} titles${failed ? ` (${failed} skipped)` : ''}`);
+}
 function refreshCounts() {
   document.getElementById('total').textContent = movies.filter(isActive).length;
+  const cb = document.getElementById('cache-btn');
+  if (cb && !cb.disabled) cb.style.display = cacheMissing().length ? 'inline-flex' : 'none';
   const wb = document.getElementById('wish-badge');
   const wc = movies.filter(isWish).length;
   if (wb) { wb.style.display = wc ? 'flex' : 'none'; wb.textContent = wc; }
@@ -476,7 +518,7 @@ function primaryGenreFor({ genres = [], kind = 'movie', lang = '' }) {
 function fmtRating(v) { const n = parseFloat(v); return isNaN(n) || n === 0 ? '' : n.toFixed(1); }
 
 function buildCsv(list) {
-  ['title_da','actors','tmdb_rating','wishlist','hidden','primary_genre'].forEach(f => { if (!csvFields.includes(f)) csvFields.push(f); });
+  ['title_da','actors','tmdb_rating','overview','wishlist','hidden','primary_genre'].forEach(f => { if (!csvFields.includes(f)) csvFields.push(f); });
   const header = csvFields.map(f => `"${f}"`).join(',');
   const rows = list.map(m =>
     csvFields.map(f => `"${String(m[f] || '').replace(/"/g,'""')}"`).join(',')
@@ -486,7 +528,22 @@ function buildCsv(list) {
 
 // Writes the CSV back to GitHub. Throws with a readable message on ANY failure
 // (bad token, missing permission, stale sha) instead of failing silently.
-async function githubWrite(csv, message) {
+let _writeChain = Promise.resolve();
+function githubWrite(csv, message) {
+  // single-flight: concurrent saves queue up instead of racing each other's sha
+  const run = _writeChain.then(() => githubWriteInner(csv, message));
+  _writeChain = run.catch(() => {});
+  return run;
+}
+async function readJsonSafe(res, what) {
+  const txt = await res.text();
+  try { return JSON.parse(txt); }
+  catch(e) {
+    const ct = res.headers.get('content-type') || 'unknown type';
+    throw new Error(`${what} came back unreadable (HTTP ${res.status}, ${ct}): "${txt.slice(0, 120)}". This is usually a flaky connection or a network proxy mangling the reply. Try again.`);
+  }
+}
+async function githubWriteInner(csv, message, attempt = 0) {
   const meta = await fetch(GITHUB_API, {
     headers: { Authorization: `token ${GH_TOKEN}` },
     cache: 'no-store'
@@ -497,7 +554,13 @@ async function githubWrite(csv, message) {
     throw new Error(`GitHub rejected the token (HTTP ${meta.status}). The saved token was cleared; you will be asked for a new one on the next save. Check that the token has "Contents: Read and write" permission on the repo.`);
   }
   if (!meta.ok) throw new Error(`Could not read movies.csv metadata (HTTP ${meta.status}).`);
-  const { sha, content } = await meta.json();
+  let sha, content;
+  try {
+    ({ sha, content } = await readJsonSafe(meta, 'GitHub metadata'));
+  } catch(e) {
+    if (attempt === 0) { await new Promise(r => setTimeout(r, 700)); return githubWriteInner(csv, message, 1); }
+    throw e;
+  }
   // Guard: never overwrite the file with fewer rows than it currently has.
   if (content) {
     const remoteRows = parseCSV(decodeURIComponent(escape(atob(content.replace(/\n/g, '')))), false).length;
@@ -513,6 +576,10 @@ async function githubWrite(csv, message) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
+    if (res.status === 409 && attempt === 0) { // sha raced another save: refetch and retry once
+      await new Promise(r => setTimeout(r, 500));
+      return githubWriteInner(csv, message, 1);
+    }
     throw new Error(`GitHub write failed (HTTP ${res.status})${err.message ? ': ' + err.message : ''}.`);
   }
 }
@@ -730,523 +797,3 @@ function renderTonight() {
       <div class="tonight-num">${i+1}</div>
       <div class="tonight-row-poster" style="background:#1a2240">
         ${m.poster_url ? `<img src="${escHtml(m.poster_url)}" alt="${escHtml(m.title)}" onerror="this.style.display='none'">` : ''}
-        <div class="poster-placeholder" style="width:18px;height:18px;border-width:2px"><div class="poster-placeholder-inner" style="width:5px;height:5px"></div></div>
-      </div>
-      <div class="tonight-row-info">
-        <div class="tonight-row-title">${escHtml(m.title)}</div>
-        <div class="tonight-row-meta">
-          <span class="tonight-fmt ${fmtClass(m.format)}">${fmtLabel(m.format)}</span>
-          <span>${m.year}</span>
-          <span>${m.runtime} min</span>
-          <span>${escHtml(m.director)}</span>
-        </div>
-      </div>
-      <button class="tonight-remove" onclick="toggleTonight('${m.uid}')">×</button>
-    </div>
-  `).join('') + '</div>';
-}
-
-function toggleTonight(id) {
-  if (tonight.has(id)) tonight.delete(id); else tonight.add(id);
-  localStorage.setItem('tonight', JSON.stringify([...tonight]));
-  renderGrid();
-  renderTonight();
-}
-
-function clearTonight() {
-  tonight.clear();
-  localStorage.setItem('tonight', '[]');
-  renderGrid();
-  renderTonight();
-}
-
-function setFormat(val) {
-  filter = val;
-  renderGrid();
-}
-
-function setUnwatched(checked) {
-  unwatched = checked;
-  renderGrid();
-}
-
-const VIEWS = ['collection','wishlist','tonight','stats'];
-function switchView(v) {
-  currentView = v;
-  document.getElementById('view-detail').classList.add('hidden');
-  VIEWS.forEach(x => document.getElementById('view-' + x).classList.toggle('hidden', x !== v));
-  document.getElementById('nav-collection').className = 'nav-item' + (v==='collection'?' active':'');
-  document.getElementById('nav-wishlist').className = 'nav-item wishlist' + (v==='wishlist'?' active':'');
-  document.getElementById('nav-tonight').className = 'nav-item tonight' + (v==='tonight'?' active':'');
-  document.getElementById('nav-stats').className = 'nav-item' + (v==='stats'?' active':'');
-  if (v === 'wishlist') renderWishlist();
-  if (v === 'stats') renderStats();
-  renderTonight();
-}
-
-function renderWishlist() {
-  const list = movies.filter(isWish).sort((a,b) => (parseInt(b.uid)||0) - (parseInt(a.uid)||0));
-  document.getElementById('wish-count').textContent = list.length + (list.length === 1 ? ' title' : ' titles');
-  const grid = document.getElementById('wish-grid');
-  if (!list.length) { grid.innerHTML = '<div class="tonight-empty" style="grid-column:1/-1">Nothing on the wishlist.<br>Use + and choose Wishlist to add films you are looking for.</div>'; return; }
-  grid.innerHTML = list.map(m => `
-    <div class="card" onclick="openDetail('${m.uid}')">
-      <div class="poster">
-        <div class="scanlines"></div>
-        ${m.poster_url ? `<img src="${escHtml(m.poster_url)}" alt="${escHtml(m.title)}" onerror="this.style.display='none'">` : ''}
-        <div class="fmt-badge ${fmtClass(m.format)}">${fmtLabel(m.format)}</div>
-      </div>
-      <div class="card-info">
-        <div class="card-meta">
-          <div class="card-title">${escHtml(m.title)}</div>
-          <div class="card-year">${escHtml(m.year)}${fmtRating(m.tmdb_rating) ? ` · <span style="color:#FFD600">${fmtRating(m.tmdb_rating)}</span>` : ''}</div>
-        </div>
-      </div>
-      <div class="wish-actions">
-        <button class="wish-btn primary" onclick="event.stopPropagation();moveToCollection('${m.uid}')">Got it</button>
-        <button class="wish-btn" onclick="event.stopPropagation();removeFromWishlist('${m.uid}')">Remove</button>
-      </div>
-    </div>`).join('');
-}
-
-// Wishlist row becomes a collection row in place (keeps uid, format, metadata).
-async function moveToCollection(uid) {
-  const m = movies.find(m => m.uid === uid);
-  if (!m || !isWish(m)) return;
-  if (movies.some(x => isActive(x) && x.imdb_id === m.imdb_id && x.format === m.format)) {
-    if (!confirm(`"${m.title}" is already in the collection on ${m.format}. Remove it from the wishlist instead?`)) return;
-    return removeFromWishlist(uid, true);
-  }
-  m.wishlist = ''; m.watched = 'false';
-  if (await persist(`Wishlist → collection: ${m.title} (${m.format})`)) {
-    afterDataChange(); showAddToast(`"${m.title}" moved to collection`);
-  } else { m.wishlist = 'true'; }
-}
-async function removeFromWishlist(uid, skipConfirm) {
-  const m = movies.find(m => m.uid === uid);
-  if (!m) return;
-  if (!skipConfirm && !confirm(`Remove "${m.title}" (${m.format}) from the wishlist?`)) return;
-  m.hidden = 'true';
-  if (await persist(`Remove from wishlist: ${m.title}`)) { afterDataChange(); showAddToast('Removed from wishlist'); }
-  else { m.hidden = ''; }
-}
-function afterDataChange() {
-  refreshCounts(); renderGrid(); populateGenres(); populateShelves();
-  if (currentView === 'wishlist') renderWishlist();
-  if (currentView === 'stats') renderStats();
-  renderTonight();
-}
-
-function renderStats() {
-  const el = document.getElementById('stats-content');
-  const list = movies.filter(isActive);
-  if (!list.length) { el.innerHTML = '<div class="tonight-empty">No films yet.</div>'; return; }
-  const n = list.length;
-  const watched = list.filter(m => m.watched === 'true').length;
-  const runtime = list.reduce((a,m) => a + (parseInt(m.runtime) || 0), 0);
-  const uniq = new Set(list.map(m => m.imdb_id).filter(Boolean)).size;
-  const rated = list.filter(m => fmtRating(m.tmdb_rating));
-  const avg = rated.length ? (rated.reduce((a,m) => a + parseFloat(m.tmdb_rating), 0) / rated.length).toFixed(1) : '–';
-  const count = (arr) => { const c = {}; arr.forEach(k => { if (k) c[k] = (c[k]||0)+1; }); return Object.entries(c).sort((a,b) => b[1]-a[1]); };
-  const formats = count(list.map(m => m.format));
-  const decades = count(list.map(m => { const y = parseInt(m.year); return y ? `${Math.floor(y/10)*10}s` : ''; })).sort((a,b) => a[0].localeCompare(b[0]));
-  const directors = count(list.map(m => m.director)).filter(([d]) => d && d !== '-').slice(0, 10);
-  const shelves = count(list.map(m => m.primary_genre || 'Unassigned'));
-  const genres = count(list.flatMap(m => (m.genre_ids||'').split('|').map(g => g.trim()))).slice(0, 10);
-  const boxsets = count(list.map(m => m.box_set)).slice(0, 10);
-  const bars = (title, rows) => rows.length ? `<div class="detail-section"><div class="detail-section-title">${title}</div>${rows.map(([k,v]) => `<div class="bar-row"><div class="bar-lbl" title="${escHtml(k)}">${escHtml(k)}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/rows[0][1]*100)}%"></div></div><div class="bar-num">${v}</div></div>`).join('')}</div>` : '';
-  const maxDec = Math.max(...decades.map(d => d[1]), 1);
-  el.innerHTML = `
-    <div class="stats-cards">
-      <div class="stat-card"><div class="stat-card-num">${n}</div><div class="stat-card-lbl">Discs</div></div>
-      <div class="stat-card"><div class="stat-card-num">${uniq}</div><div class="stat-card-lbl">Unique titles</div></div>
-      <div class="stat-card"><div class="stat-card-num">${Math.round(watched/n*100)}%</div><div class="stat-card-lbl">Watched (${watched}/${n})</div></div>
-      <div class="stat-card"><div class="stat-card-num">${n - watched}</div><div class="stat-card-lbl">Unwatched</div></div>
-      <div class="stat-card"><div class="stat-card-num">${Math.round(runtime/60)}h</div><div class="stat-card-lbl">Total runtime</div></div>
-      <div class="stat-card"><div class="stat-card-num">${avg}</div><div class="stat-card-lbl">Avg TMDB rating</div></div>
-      <div class="stat-card"><div class="stat-card-num">${movies.filter(isWish).length}</div><div class="stat-card-lbl">On wishlist</div></div>
-    </div>
-    <div class="stats-cols">
-      <div>
-        ${bars('Formats', formats)}
-        <div class="detail-section"><div class="detail-section-title">Decades</div>${decades.map(([k,v]) => `<div class="bar-row"><div class="bar-lbl">${k}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/maxDec*100)}%"></div></div><div class="bar-num">${v}</div></div>`).join('')}</div>
-        ${bars('Box sets', boxsets)}
-      </div>
-      <div>
-        ${bars('Top directors', directors)}
-        ${bars('Shelves', shelves)}
-        ${bars('Top genres', genres)}
-      </div>
-    </div>`;
-}
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-async function openDetail(uid) {
-  const m = movies.find(m => m.uid === uid);
-  if (!m) return;
-  const imdbId = m.imdb_id;
-  VIEWS.forEach(x => document.getElementById('view-' + x).classList.add('hidden'));
-  const el = document.getElementById('view-detail');
-  el.classList.remove('hidden');
-  el.innerHTML = '<div class="detail-view"><div class="detail-backdrop-wrap"><div class="detail-backdrop"></div><button class="back-btn" onclick="closeDetail()">← Back</button></div><div class="detail-content" style="color:#9BA3C4;padding-top:40px;text-align:center">Loading...</div></div>';
-  window.scrollTo(0, 0);
-  try {
-    const findData = await tmdbFetch(`/find/${imdbId}?external_source=imdb_id`);
-    let tmdbId = findData.movie_results?.[0]?.id, kind = 'movie';
-    if (!tmdbId) { tmdbId = findData.tv_results?.[0]?.id; kind = 'tv'; }
-    if (!tmdbId) throw new Error('Not found');
-    const d = await tmdbFetch(`/${kind}/${tmdbId}?append_to_response=credits,videos,${kind === 'movie' ? 'release_dates' : 'content_ratings'}`);
-
-    const backdropUrl = d.backdrop_path ? `https://image.tmdb.org/t/p/w1280${d.backdrop_path}` : '';
-    const posterUrl = d.poster_path ? `https://image.tmdb.org/t/p/w342${d.poster_path}` : (m.poster_url || '');
-    const score = d.vote_average ? Math.round(d.vote_average * 10) : null;
-    const director = (kind === 'movie'
-      ? d.credits?.crew?.find(c => c.job === 'Director')?.name
-      : d.created_by?.[0]?.name) || m.director || '';
-    const directorLabel = kind === 'movie' ? 'Director' : 'Created by';
-    const cast = (d.credits?.cast || []).slice(0, 8);
-    const genres = (d.genres || []).map(g => g.name);
-    const trailer = d.videos?.results?.find(v => v.type === 'Trailer' && v.site === 'YouTube');
-    const cert = kind === 'movie'
-      ? (d.release_dates?.results?.find(r => r.iso_3166_1 === 'US')
-          ?.release_dates?.find(r => r.certification)?.certification || '')
-      : (d.content_ratings?.results?.find(r => r.iso_3166_1 === 'US')?.rating || '');
-    const isWatched = m.watched === 'true';
-
-    el.innerHTML = `
-      <div class="detail-view">
-        <div class="detail-backdrop-wrap">
-          <div class="detail-backdrop"${backdropUrl ? ` style="background-image:url('${backdropUrl}')"` : ''}></div>
-          <button class="back-btn" onclick="closeDetail()">← Back</button>
-        </div>
-        <div class="detail-content">
-          <div class="detail-hero">
-            <div class="detail-poster">
-              ${posterUrl ? `<img src="${posterUrl}" alt="${escHtml(m.title)}">` : '<div class="poster-placeholder"><div class="poster-placeholder-inner"></div></div>'}
-            </div>
-            <div class="detail-info">
-              <div class="detail-title">${escHtml(d.title || d.name || m.title)}</div>
-              <div class="detail-meta">
-                <span>${escHtml(m.year)}</span>
-                ${m.runtime ? `<span>${escHtml(m.runtime)} min</span>` : ''}
-                ${cert ? `<span class="detail-cert">${escHtml(cert)}</span>` : ''}
-                <span class="fmt-badge ${fmtClass(m.format)}">${fmtLabel(m.format)}</span>
-                ${m.box_set ? `<span class="detail-boxset-label">${escHtml(m.box_set)}</span>` : ''}
-                ${m.primary_genre ? `<span class="detail-cert" style="color:#FFD600;border-color:#FFD600">${escHtml(m.primary_genre)}</span>` : ''}
-              </div>
-              ${score !== null ? `<div class="detail-score"><span class="detail-score-pct">${score}%</span><span class="detail-score-lbl">TMDB<br>Score</span></div>` : ''}
-              ${d.tagline ? `<div class="detail-tagline">${escHtml(d.tagline)}</div>` : ''}
-              <div class="detail-actions">
-                ${isWish(m) ? `
-                <button class="trailer-btn" onclick="moveToCollection('${m.uid}').then(()=>closeDetail())">Got it → Collection</button>
-                <button class="detail-watched-btn" onclick="removeFromWishlist('${m.uid}').then(()=>{ if(!movies.find(x=>x.uid==='${m.uid}'&&isWish(x))) closeDetail(); })">Remove from wishlist</button>
-                ` : `
-                <button class="detail-watched-btn${isWatched ? ' is-watched' : ''}" id="detail-watched-btn" onclick="detailToggleWatched('${m.uid}')">
-                  ${isWatched ? '✓ Watched' : 'Mark as Watched'}
-                </button>`}
-                ${trailer ? `<a class="trailer-btn" href="https://www.youtube.com/watch?v=${trailer.key}" target="_blank" rel="noopener">▶ Trailer</a>` : ''}
-                <button class="detail-watched-btn" onclick="toggleEditPanel()">Edit</button>
-              </div>
-            </div>
-          </div>
-          <div class="edit-panel" id="edit-panel">
-            <div class="edit-row">
-              <div class="edit-field"><label>Format</label>
-                <select id="edit-format">${['DVD','Blu-ray','4K Ultra HD','VHS'].map(f => `<option value="${f}"${m.format === f ? ' selected' : ''}>${f}</option>`).join('')}</select>
-              </div>
-              <div class="edit-field"><label>Primary genre</label>
-                <select id="edit-pgenre">
-                  <option value="">None</option>
-                  ${[...new Set([...SHELVES, ...movies.map(x => x.primary_genre).filter(Boolean)])].map(v => `<option value="${escHtml(v)}"${(m.primary_genre || '') === v ? ' selected' : ''}>${escHtml(v)}</option>`).join('')}
-                </select>
-              </div>
-              <div class="edit-field"><label>Box set</label>
-                <input id="edit-boxset" list="boxset-list" value="${escHtml(m.box_set || '')}" placeholder="None">
-                <datalist id="boxset-list">${[...new Set(movies.map(x => x.box_set).filter(Boolean))].sort().map(b => `<option value="${escHtml(b)}">`).join('')}</datalist>
-              </div>
-              <div class="edit-field"><label>Barcode</label>
-                <input id="edit-barcode" value="${escHtml(m.barcode || '')}" placeholder="EAN / UPC" inputmode="numeric">
-              </div>
-              <div class="edit-field"><label>Year</label>
-                <input id="edit-year" value="${escHtml(m.year || '')}" inputmode="numeric" style="max-width:100px">
-              </div>
-            </div>
-            <div class="edit-actions">
-              <button class="danger-btn" onclick="deleteFilm('${m.uid}')">Delete from ${isWish(m) ? 'wishlist' : 'collection'}</button>
-              <div style="display:flex;gap:8px">
-                <button class="detail-watched-btn" onclick="toggleEditPanel()">Cancel</button>
-                <button class="trailer-btn" onclick="saveEdit('${m.uid}')">Save changes</button>
-              </div>
-            </div>
-          </div>
-          ${d.overview ? `<div class="detail-section"><div class="detail-section-title">Overview</div><p class="detail-overview">${escHtml(d.overview)}</p></div>` : ''}
-          ${director ? `<div class="detail-section"><div class="detail-section-title">${directorLabel}</div><p class="detail-director-name">${escHtml(director)}</p></div>` : ''}
-          ${cast.length ? `<div class="detail-section"><div class="detail-section-title">Cast</div><div class="cast-grid">${cast.map(c => `<div class="cast-card">${c.profile_path ? `<img class="cast-photo" src="https://image.tmdb.org/t/p/w185${c.profile_path}" alt="${escHtml(c.name)}">` : '<div class="cast-no-photo"></div>'}<div class="cast-name">${escHtml(c.name)}</div><div class="cast-char">${escHtml(c.character)}</div></div>`).join('')}</div></div>` : ''}
-          ${genres.length ? `<div class="detail-section"><div class="detail-section-title">Genres</div><div class="genre-tags">${genres.map(g => `<span class="genre-tag">${escHtml(g)}</span>`).join('')}</div></div>` : ''}
-        </div>
-      </div>`;
-  } catch(e) {
-    el.innerHTML = `<div class="detail-view"><div class="detail-backdrop-wrap"><div class="detail-backdrop"></div><button class="back-btn" onclick="closeDetail()">← Back</button></div><div class="detail-content"><p class="detail-error">Could not load film details.</p></div></div>`;
-  }
-}
-
-function closeDetail() {
-  switchView(currentView);
-  window.scrollTo(0, 0);
-}
-
-function toggleEditPanel() { const p = document.getElementById('edit-panel'); if (p) p.classList.toggle('open'); }
-
-async function saveEdit(uid) {
-  const m = movies.find(m => m.uid === uid);
-  if (!m) return;
-  const next = {
-    format: document.getElementById('edit-format').value,
-    box_set: document.getElementById('edit-boxset').value.trim(),
-    primary_genre: document.getElementById('edit-pgenre').value,
-    barcode: document.getElementById('edit-barcode').value.trim(),
-    year: document.getElementById('edit-year').value.trim()
-  };
-  if (next.format !== m.format && movies.some(x => x.uid !== uid && x.hidden !== 'true' && x.wishlist === m.wishlist && x.imdb_id === m.imdb_id && x.format === next.format)) {
-    alert(`"${m.title}" already exists on ${next.format}.`); return;
-  }
-  const prev = { format: m.format, box_set: m.box_set, primary_genre: m.primary_genre, barcode: m.barcode, year: m.year };
-  if (Object.keys(next).every(k => (next[k] || '') === (prev[k] || ''))) { toggleEditPanel(); return; }
-  Object.assign(m, next);
-  if (await persist(`Edit: ${m.title}`)) { afterDataChange(); openDetail(uid); showAddToast('Changes saved'); }
-  else { Object.assign(m, prev); }
-}
-
-// Soft delete: row stays in the CSV with hidden=true, so history and the write guard both hold.
-async function deleteFilm(uid) {
-  const m = movies.find(m => m.uid === uid);
-  if (!m) return;
-  if (!confirm(`Delete "${m.title}" (${m.format})? It is hidden, not removed from the CSV, so it can be restored by hand.`)) return;
-  m.hidden = 'true';
-  tonight.delete(uid); localStorage.setItem('tonight', JSON.stringify([...tonight]));
-  if (await persist(`Delete: ${m.title} (${m.format})`)) { afterDataChange(); closeDetail(); showAddToast(`"${m.title}" deleted`); }
-  else { m.hidden = ''; }
-}
-
-async function detailToggleWatched(uid) {
-  await toggleWatched(uid);
-  const m = movies.find(m => m.uid === uid);
-  if (!m) return;
-  const btn = document.getElementById('detail-watched-btn');
-  if (!btn) return;
-  const isWatched = m.watched === 'true';
-  btn.textContent = isWatched ? '✓ Watched' : 'Mark as Watched';
-  btn.classList.toggle('is-watched', isWatched);
-}
-
-function updateSaveLabel() {
-  const t = document.getElementById('add-target').value;
-  document.getElementById('modal-save-btn').textContent = t === 'wishlist' ? 'Save to wishlist' : 'Save to collection';
-  document.getElementById('add-modal-title').textContent = t === 'wishlist' ? 'Add to Wishlist' : 'Add to Collection';
-}
-function openAddModal() {
-  const m = document.getElementById('add-modal');
-  m.style.display = 'flex';
-  document.getElementById('add-target').value = currentView === 'wishlist' ? 'wishlist' : 'collection';
-  updateSaveLabel();
-  document.getElementById('modal-results').innerHTML = '';
-  document.getElementById('modal-query').value = '';
-  renderQueue();
-  setTimeout(() => document.getElementById('modal-query').focus(), 50);
-}
-
-function closeAddModal() {
-  document.getElementById('add-modal').style.display = 'none';
-}
-
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAddModal(); cancelToken(); } });
-
-async function searchFilmTMDB() {
-  const q = document.getElementById('modal-query').value.trim();
-  if (!q) return;
-  const kind = document.getElementById('add-kind').value;
-  const el = document.getElementById('modal-results');
-  el.innerHTML = '<div class="modal-status">Searching…</div>';
-  try {
-    const data = await tmdbFetch(`/search/${kind}?query=${encodeURIComponent(q)}&language=en-US&page=1`);
-    const results = (data.results || []).slice(0, 10);
-    if (!results.length) { el.innerHTML = '<div class="modal-status">No results found.</div>'; return; }
-    el.innerHTML = results.map(r => {
-      const key = `${kind}-${r.id}`;
-      const title = r.title || r.name || '';
-      const year = (r.release_date || r.first_air_date || '').slice(0,4) || '—';
-      return `
-      <div class="modal-result" id="mr-${key}">
-        ${r.poster_path ? `<img class="modal-result-poster" src="https://image.tmdb.org/t/p/w92${r.poster_path}" alt="${escHtml(title)}">` : '<div class="modal-poster-empty"></div>'}
-        <div class="modal-result-info">
-          <div class="modal-result-title">${escHtml(title)}</div>
-          <div class="modal-result-meta">${year} · <span id="dir-${key}">${kind === 'tv' ? 'TV series' : '…'}</span></div>
-        </div>
-        <select class="modal-fmt-select" id="fmt-${key}">
-          <option value="DVD" selected>DVD</option>
-          <option value="Blu-ray">Blu-ray</option>
-          <option value="4K Ultra HD">4K Ultra HD</option>
-          <option value="VHS">VHS</option>
-        </select>
-        <button class="modal-add-btn" onclick="queueFilm('${kind}', ${r.id})">${pendingAdds.some(p => p.key === key) ? 'Added ✓' : 'Add'}</button>
-      </div>`;
-    }).join('');
-    if (kind === 'movie') results.forEach(async r => {
-      try {
-        const credits = await tmdbFetch(`/movie/${r.id}/credits`);
-        const dir = credits.crew?.find(c => c.job === 'Director')?.name || '—';
-        const d = document.getElementById(`dir-movie-${r.id}`);
-        if (d) d.textContent = dir;
-      } catch { const d = document.getElementById(`dir-movie-${r.id}`); if (d) d.textContent = '—'; }
-    });
-  } catch(e) {
-    el.innerHTML = '<div class="modal-status">Search failed. Please try again.</div>';
-  }
-}
-
-// Queue a film locally (fetches TMDB details now, writes to GitHub only on Save)
-async function queueFilm(kind, tmdbId) {
-  const key = `${kind}-${tmdbId}`;
-  if (pendingAdds.some(p => p.key === key)) { unqueueFilm(key); return; }
-  const btn = document.querySelector(`#mr-${key} .modal-add-btn`);
-  const fmt = document.getElementById(`fmt-${key}`)?.value || 'DVD';
-  const target = document.getElementById('add-target').value;
-  if (btn) { btn.textContent = '…'; btn.disabled = true; }
-  try {
-    const d = await tmdbFetch(`/${kind}/${tmdbId}?append_to_response=credits,external_ids,translations`);
-    const imdbId = d.external_ids?.imdb_id || '';
-    const title = d.title || d.name || '';
-    if (imdbId) {
-      const inColl = movies.some(m => isActive(m) && m.imdb_id === imdbId && m.format === fmt);
-      const inWish = movies.some(m => isWish(m) && m.imdb_id === imdbId && m.format === fmt);
-      if (inColl) { alert(`"${title}" is already in the collection on ${fmt}.`); if (btn) { btn.textContent = 'Add'; btn.disabled = false; } return; }
-      if (target === 'wishlist' && inWish) { alert(`"${title}" is already on the wishlist on ${fmt}.`); if (btn) { btn.textContent = 'Add'; btn.disabled = false; } return; }
-    }
-    const daTitle = d.translations?.translations?.find(t => t.iso_639_1 === 'da')?.data?.title || '';
-    pendingAdds.push({
-      key,
-      title,
-      year: (d.release_date || d.first_air_date || '').slice(0, 4),
-      format: fmt,
-      barcode: '',
-      imdb_id: imdbId,
-      runtime: String(kind === 'tv' ? (d.episode_run_time?.[0] || '') : (d.runtime || '')),
-      director: kind === 'tv' ? (d.created_by?.[0]?.name || '') : (d.credits?.crew?.find(c => c.job === 'Director')?.name || ''),
-      watched: 'false',
-      poster_url: d.poster_path ? `https://image.tmdb.org/t/p/w300${d.poster_path}` : '',
-      box_set: '',
-      genre_ids: (d.genres || []).map(g => g.name).join('|'),
-      tmdb_rating: fmtRating(d.vote_average),
-      primary_genre: primaryGenreFor({ genres: (d.genres || []).map(g => g.name), kind, lang: d.original_language || '' }),
-      title_da: daTitle,
-      actors: (d.credits?.cast || []).slice(0, 5).map(c => c.name).join('|') || '-',
-      wishlist: target === 'wishlist' ? 'true' : '',
-      hidden: ''
-    });
-    if (btn) { btn.textContent = 'Added ✓'; btn.disabled = false; }
-    renderQueue();
-  } catch(e) {
-    console.error('Queue film failed:', e);
-    if (btn) { btn.textContent = 'Add'; btn.disabled = false; }
-    alert('Could not fetch details.\n\n' + e.message);
-  }
-}
-
-function unqueueFilm(key) {
-  pendingAdds = pendingAdds.filter(p => p.key !== key);
-  const btn = document.querySelector(`#mr-${key} .modal-add-btn`);
-  if (btn) { btn.textContent = 'Add'; btn.disabled = false; }
-  renderQueue();
-}
-
-function renderQueue() {
-  const footer = document.getElementById('modal-footer');
-  const chips = document.getElementById('queue-chips');
-  const count = document.getElementById('queue-count');
-  if (!footer) return;
-  if (pendingAdds.length === 0) { footer.style.display = 'none'; return; }
-  footer.style.display = 'flex';
-  count.textContent = pendingAdds.length + (pendingAdds.length === 1 ? ' film queued' : ' films queued');
-  chips.innerHTML = pendingAdds.map(p => `
-    <span class="queue-chip">
-      ${escHtml(p.title)} <span class="queue-chip-fmt">${escHtml(fmtLabel(p.format))}</span>
-      <button class="queue-chip-x" onclick="unqueueFilm('${p.key}')" title="Remove">×</button>
-    </span>`).join('');
-}
-
-// One GitHub write, one commit, for everything in the queue
-async function commitAdds() {
-  if (!pendingAdds.length) return;
-  if (!GH_TOKEN && !(await promptToken())) return;
-  const saveBtn = document.getElementById('modal-save-btn');
-  saveBtn.disabled = true;
-  saveBtn.textContent = 'Saving…';
-  try {
-    const target = document.getElementById('add-target').value;
-    let nextUid = movies.reduce((max, m) => Math.max(max, parseInt(m.uid) || 0), 0);
-    const newMovies = [];
-    let moved = 0;
-    const touched = [];   // wishlist rows converted in place, with their previous state for rollback
-    pendingAdds.forEach(p => {
-      const { key, ...rest } = p;
-      // Adding to the collection something that is on the wishlist in the same format:
-      // convert that wishlist row instead of creating a second one.
-      const w = target === 'collection' && rest.imdb_id
-        ? movies.find(m => isWish(m) && m.imdb_id === rest.imdb_id && m.format === rest.format) : null;
-      if (w) {
-        touched.push({ row: w, prev: { ...w } });
-        Object.assign(w, rest, { uid: w.uid, wishlist: '', watched: 'false' });
-        moved++;
-      } else {
-        newMovies.push({ uid: String(++nextUid), ...rest });
-      }
-    });
-    const where = target === 'wishlist' ? 'wishlist' : 'collection';
-    const total = newMovies.length + moved;
-    const message = total === 1
-      ? `Add to ${where}: ${pendingAdds[0].title}${moved ? ' (from wishlist)' : ''}`
-      : `Add ${total} titles to ${where}${moved ? ` (${moved} from wishlist)` : ''}`;
-    try {
-      await githubWrite(buildCsv([...movies, ...newMovies]), message);
-    } catch(e) {
-      touched.forEach(t => Object.assign(t.row, t.prev));
-      throw e;
-    }
-    movies.push(...newMovies);
-    afterDataChange();
-    pendingAdds = [];
-    renderQueue();
-    closeAddModal();
-    showAddToast(total === 1
-      ? `"${newMovies[0]?.title || touched[0].row.title}" added to ${where}${moved ? ' (moved from wishlist)' : ''}`
-      : `${total} titles added to ${where}${moved ? `, ${moved} moved from wishlist` : ''}`);
-  } catch(e) {
-    console.error('Save failed:', e);
-    alert('Could not save to GitHub. Your queued films are still in the list.\n\n' + e.message);
-  } finally {
-    saveBtn.disabled = false;
-    saveBtn.textContent = 'Save to collection';
-  }
-}
-
-function showAddToast(msg) {
-  const t = document.getElementById('add-toast');
-  t.textContent = msg;
-  t.style.display = 'block';
-  t.classList.remove('fade-out');
-  setTimeout(() => {
-    t.classList.add('fade-out');
-    setTimeout(() => { t.style.display = 'none'; t.classList.remove('fade-out'); }, 400);
-  }, 3000);
-}
-
-loadMovies();
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW registration failed:', e));
-}
-</script>
-</body>
-</html>
